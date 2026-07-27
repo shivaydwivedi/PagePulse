@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 3 establishes destination-safety validation before any outbound request can be introduced. The API now validates and normalises audit URLs, blocks explicit unsafe hostnames, classifies literal IP addresses, resolves domain names through the operating-system resolver, and rejects any destination that does not resolve exclusively to public unicast addresses.
+Phase 4 establishes the safe outbound HTTP transport layer. The API now validates and normalises audit URLs, performs destination-safety checks, connects through an approved-address dispatcher, follows safe redirects manually, enforces timeouts and response-size limits, accepts only HTML content types, and returns transport metadata.
 
-Remote page fetching and audit generation are not implemented yet. Caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are also not implemented yet.
+HTML parsing, SEO checks, scoring, caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
 
 ## Technology Stack
 
@@ -61,6 +61,10 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 | `PORT` | `3000` | Integer from `1` to `65535` | HTTP server port |
 | `LOG_LEVEL` | `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` | Structured logger level |
 | `REQUEST_BODY_LIMIT` | `16kb` | Size string such as `16kb` | JSON request body limit |
+| `AUDIT_TIMEOUT_MS` | `8000` | Integer from `500` to `30000` | Overall outbound audit transport timeout, including destination validation, DNS wait, redirects, and body streaming |
+| `AUDIT_MAX_REDIRECTS` | `5` | Integer from `0` to `10` | Maximum manual redirects to follow |
+| `AUDIT_MAX_RESPONSE_BYTES` | `1048576` | Integer from `1024` to `5242880` | Maximum upstream response body bytes |
+| `AUDIT_USER_AGENT` | `PagePulseBot/1.0` | 1-120 chars after requiring at least one non-whitespace character, no CR/LF | Outbound audit User-Agent |
 
 ## Available Scripts
 
@@ -92,7 +96,7 @@ Every response includes an `X-Request-ID` header.
 
 ### `POST /api/v1/audits`
 
-Validates and normalises an audit target URL. In Phase 2, this endpoint intentionally does not fetch the remote page and does not generate audit data.
+Validates, normalises, safety-checks, and fetches an audit target URL. In Phase 4, this endpoint returns transport metadata only. It does not parse HTML, run SEO checks, or calculate a score.
 
 Request body:
 
@@ -126,28 +130,29 @@ URL normalisation rules currently implemented:
 - Pathname case, query strings, and meaningful trailing slashes are preserved.
 - URL fragments are removed because fragments are not sent in HTTP requests.
 
-Important security boundary: Phase 3 performs hostname, DNS, and IP destination checks before the temporary response, but it does not fetch the URL. This layer is not a claim of complete SSRF prevention. See the security model below for current guarantees and limitations.
+Important security boundary: Phase 4 performs destination checks before the initial connection and before every redirect. It also uses a per-request approved-address dispatcher so the connection path receives only the addresses approved for that specific URL step. This materially reduces DNS rebinding risk, but it is not a claim of complete SSRF prevention. See the security model below for current guarantees and limitations.
 
-Temporary Phase 2 response for a valid request:
+Successful transport response:
 
 ```json
 {
-  "success": false,
+  "success": true,
   "requestId": "current-request-id",
-  "error": {
-    "code": "AUDIT_PROCESSING_NOT_IMPLEMENTED",
-    "message": "URL validation succeeded, but audit processing is not implemented yet.",
-    "details": [
-      {
-        "field": "url",
-        "normalisedUrl": "https://example.com/"
-      }
-    ]
+  "data": {
+    "requestedUrl": "https://example.com/",
+    "finalUrl": "https://example.com/",
+    "httpStatus": 200,
+    "redirectCount": 0,
+    "responseTimeMs": 123,
+    "contentType": "text/html; charset=UTF-8",
+    "responseSizeBytes": 1256,
+    "auditedAt": "2026-07-27T00:00:00.000Z",
+    "auditStatus": "transport_complete"
   }
 }
 ```
 
-This response uses HTTP `501` and will be removed when safe fetching and audit processing are implemented.
+The PagePulse API returns HTTP `200` when transport completes and the upstream response is supported HTML, even if the upstream website returns a status such as `404` or `500`. The upstream status is reported as `httpStatus`. The full HTML body is retained internally for the next phase and is not returned publicly.
 
 Example Bash request:
 
@@ -200,13 +205,20 @@ Current public error codes:
 | `BLOCKED_TARGET` | 400 | URL hostname or resolved destination is not allowed |
 | `DNS_LOOKUP_FAILED` | 502 | Destination hostname could not be resolved |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Request body was supplied with a non-JSON content type |
-| `AUDIT_PROCESSING_NOT_IMPLEMENTED` | 501 | URL validation succeeded, but audit processing is not implemented yet |
+| `UPSTREAM_TIMEOUT` | 504 | Destination did not respond within the allowed time |
+| `UPSTREAM_CONNECTION_FAILED` | 502 | PagePulse could not connect to the destination |
+| `UPSTREAM_TLS_ERROR` | 502 | PagePulse could not establish a secure connection to the destination |
+| `TOO_MANY_REDIRECTS` | 502 | Destination exceeded the redirect limit |
+| `INVALID_REDIRECT` | 502 | Destination returned an invalid redirect |
+| `RESPONSE_TOO_LARGE` | 502 | Destination response exceeded the allowed size |
+| `UPSTREAM_UNSUPPORTED_CONTENT` | 422 | Destination did not return supported HTML content |
+| `UPSTREAM_REQUEST_FAILED` | 502 | Controlled fallback for other upstream transport failures |
 | `NOT_FOUND` | 404 | Route was not found |
 | `INTERNAL_ERROR` | 500 | Unexpected application error |
 
 ## Destination Safety And SSRF Model
 
-PagePulse performs destination validation before the future HTTP audit client is allowed to fetch a URL. The goal is to reduce server-side request forgery risk by failing closed unless the audit target is clearly a public destination.
+PagePulse performs destination validation before outbound transport and again before every redirect. The goal is to reduce server-side request forgery risk by failing closed unless the audit target is clearly a public destination.
 
 ```mermaid
 flowchart TD
@@ -218,7 +230,11 @@ flowchart TD
     DNS --> IPCheck
     IPCheck --> Safe{"All addresses public?"}
     Safe -->|No| Block["Reject target"]
-    Safe -->|Yes| Continue["Continue to temporary 501 boundary"]
+    Safe -->|Yes| Dispatcher["Create approved-address dispatcher"]
+    Dispatcher --> Fetch["Fetch with Undici"]
+    Fetch --> Redirect{"Recognised redirect?"}
+    Redirect -->|Yes| Validate
+    Redirect -->|No| Transport["Return transport metadata"]
 ```
 
 Current destination-safety behaviour:
@@ -226,11 +242,29 @@ Current destination-safety behaviour:
 - Blocks explicit hostname forms such as `localhost`, `localhost.`, `*.localhost`, `ip6-localhost`, `ip6-loopback`, `broadcasthost`, and `localhost.localdomain`.
 - Detects literal IPv4 and bracketed IPv6 URL hostnames and classifies them without DNS lookup.
 - Uses Node's promise-based `dns.lookup(hostname, { all: true, verbatim: true })` for domain names so validation follows the operating-system resolver path used by normal connections.
+- Observes the overall audit timeout while waiting for DNS. Node does not provide true cancellation for every in-flight `dns.lookup` operation, so PagePulse races lookup completion against the audit `AbortSignal` and rejects promptly while ignoring late lookup completion.
 - Rejects DNS failures and empty DNS results.
 - Rejects mixed DNS answers if any returned address is private, loopback, link-local, multicast, documentation, benchmarking, reserved, unspecified, or otherwise not confidently public.
 - Accepts DNS answers only when every address parses correctly and every resolver `family` value matches the actual address family.
 - Reduces IPv4-mapped IPv6 addresses to their mapped IPv4 address and applies the IPv4 rules.
 - Rejects uncertain or malformed resolver results instead of attempting to continue.
+- Supplies only approved addresses to the per-request Undici dispatcher lookup boundary.
+- Preserves the original URL hostname for HTTP host handling and TLS server-name verification.
+- Includes a deterministic local-socket test proving the production approved-address Undici dispatcher can connect through a fake hostname mapped by the approved lookup while preserving the original `Host` header. That test exercises transport mechanics only; destination policy still correctly blocks loopback audit targets.
+
+Safe HTTP transport behaviour:
+
+- Uses outbound `GET` only.
+- Sends only `Accept`, configured `User-Agent`, and `Accept-Encoding: identity`.
+- Does not forward inbound headers, cookies, authorization, proxy authorization, or user-provided headers.
+- Handles redirects manually for `301`, `302`, `303`, `307`, and `308`.
+- Revalidates every redirect target before following it.
+- Rejects redirects without `Location`, malformed locations, unsupported protocols, embedded credentials, blocked targets, and redirect chains over the configured limit.
+- Enforces a single overall timeout for the transport attempt.
+- Applies that timeout across initial destination validation, DNS wait, dispatcher creation boundaries, the outbound request, redirect validation, and upstream body streaming.
+- Rejects responses over `AUDIT_MAX_RESPONSE_BYTES`, even when `Content-Length` is missing or wrong.
+- Accepts `text/html` and `application/xhtml+xml`, including charset parameters.
+- Rejects missing, malformed, or non-HTML upstream content types.
 
 Blocked target categories include:
 
@@ -286,10 +320,10 @@ Example DNS failure response:
 
 Current security limitations:
 
-- PagePulse still does not make outbound HTTP requests; the safety layer currently gates the temporary `501` boundary.
-- DNS rebinding between validation and a future connection is not fully eliminated yet.
-- The future HTTP-client phase must revalidate every redirect target with the same destination-safety service.
-- Controlled socket connection, DNS pinning, and custom Undici dispatcher behaviour are not implemented yet.
+- PagePulse now performs outbound HTTP transport, but it still does not parse HTML or produce audit scores.
+- DNS rebinding risk is reduced by per-step approved-address dispatching, but not eliminated by application-level checks alone.
+- Real certificate and SNI behaviour relies on Undici's TLS stack and preserving the original hostname as `servername`; full production certificate-path validation may still require deployment-level validation against the eventual hosting environment.
+- Deployment proxies, custom infrastructure, or future distributed architecture may require network-level egress rules.
 - Cloud metadata hostnames, unusual resolver behaviour, split-horizon DNS, and deployment-network differences may require platform-specific hardening.
 - URL parser canonicalisation can transform unusual numeric host forms before destination validation; uncertain parsed IP forms are rejected where they reach the IP classifier.
 

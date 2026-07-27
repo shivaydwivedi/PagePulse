@@ -6,6 +6,7 @@ import { notFoundMiddleware } from './middleware/not-found.middleware.js'
 import { requestIdMiddleware } from './middleware/request-id.middleware.js'
 import { auditRouter } from './routes/audit.routes.js'
 import { healthRouter } from './routes/health.routes.js'
+import { createAuditHttpClient } from './infrastructure/http/audit-http-client.js'
 import { createDestinationSafetyService } from './services/destination-safety.service.js'
 
 export function createApp(options = {}) {
@@ -15,6 +16,13 @@ export function createApp(options = {}) {
 
   app.locals.destinationSafetyService = options.destinationSafetyService ?? createDestinationSafetyService({
     resolver: options.resolver
+  })
+  app.locals.auditHttpClient = options.auditHttpClient ?? createAuditHttpClient({
+    config,
+    destinationSafetyService: app.locals.destinationSafetyService,
+    dispatcherFactory: options.dispatcherFactory,
+    requestFn: options.requestFn,
+    clock: options.clock
   })
 
   app.disable('x-powered-by')

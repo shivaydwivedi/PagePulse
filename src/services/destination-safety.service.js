@@ -28,6 +28,12 @@ function dnsLookupFailedError(hostname, cause) {
   })
 }
 
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw signal.reason ?? new DOMException('The operation was aborted.', 'AbortError')
+  }
+}
+
 function assertSafeAddress(address, hostname, expectedFamily) {
   const actualFamily = getIpAddressFamily(address)
 
@@ -45,7 +51,10 @@ function assertSafeAddress(address, hostname, expectedFamily) {
 export function createDestinationSafetyService(options = {}) {
   const resolver = options.resolver ?? resolveHostname
 
-  async function validateDestination(normalisedUrl) {
+  async function validateDestination(normalisedUrl, options = {}) {
+    const { signal } = options
+    throwIfAborted(signal)
+
     const url = new URL(normalisedUrl)
     const hostname = url.hostname
 
@@ -65,7 +74,7 @@ export function createDestinationSafetyService(options = {}) {
     let resolvedAddresses
 
     try {
-      resolvedAddresses = await resolver(hostname)
+      resolvedAddresses = await resolver(hostname, { signal })
     } catch (error) {
       if (error instanceof AppError && error.code === 'DNS_LOOKUP_FAILED') {
         throw error
@@ -77,6 +86,8 @@ export function createDestinationSafetyService(options = {}) {
     if (!Array.isArray(resolvedAddresses) || resolvedAddresses.length === 0) {
       throw dnsLookupFailedError(hostname)
     }
+
+    throwIfAborted(signal)
 
     for (const result of resolvedAddresses) {
       if (![4, 6].includes(result?.family) || typeof result.address !== 'string') {

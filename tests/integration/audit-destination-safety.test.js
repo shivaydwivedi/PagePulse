@@ -6,26 +6,42 @@ const testConfig = {
   NODE_ENV: 'test',
   PORT: 3000,
   LOG_LEVEL: 'info',
-  REQUEST_BODY_LIMIT: '16kb'
+  REQUEST_BODY_LIMIT: '16kb',
+  AUDIT_TIMEOUT_MS: 8000,
+  AUDIT_MAX_REDIRECTS: 5,
+  AUDIT_MAX_RESPONSE_BYTES: 1048576,
+  AUDIT_USER_AGENT: 'PagePulseBot/1.0'
 }
 
-function createTestApp(resolver) {
-  return createApp({ config: testConfig, resolver })
+function createTestApp(resolver, requestFn = async () => ({
+  statusCode: 200,
+  headers: { 'content-type': 'text/html' },
+  body: [Buffer.from('<html></html>')]
+})) {
+  return createApp({
+    config: testConfig,
+    resolver,
+    requestFn,
+    dispatcherFactory: (destination) => ({
+      dispatcher: { destination },
+      close: async () => {}
+    })
+  })
 }
 
 describe('audit destination safety integration', () => {
-  it('lets public hostnames with fake public DNS reach the temporary 501 boundary', async () => {
+  it('lets public hostnames with fake public DNS reach the transport boundary', async () => {
     const response = await request(createTestApp(async () => [{ address: '93.184.216.34', family: 4 }]))
       .post('/api/v1/audits')
       .set('X-Request-ID', 'safe-destination-id')
       .send({ url: 'https://EXAMPLE.com:443/path?q=1#section' })
-      .expect(501)
+      .expect(200)
 
     expect(response.headers['x-request-id']).toBe('safe-destination-id')
-    expect(response.body.error).toEqual({
-      code: 'AUDIT_PROCESSING_NOT_IMPLEMENTED',
-      message: 'URL validation succeeded, but audit processing is not implemented yet.',
-      details: [{ field: 'url', normalisedUrl: 'https://example.com/path?q=1' }]
+    expect(response.body.data).toMatchObject({
+      requestedUrl: 'https://example.com/path?q=1',
+      finalUrl: 'https://example.com/path?q=1',
+      auditStatus: 'transport_complete'
     })
   })
 

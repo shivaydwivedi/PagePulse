@@ -1,20 +1,23 @@
 import { prepareAuditRequest } from '../services/audit.service.js'
-import { errorEnvelope } from '../utils/response-envelope.js'
+import { successEnvelope } from '../utils/response-envelope.js'
 
 export async function createAuditController(req, res) {
-  const { normalisedUrl } = await prepareAuditRequest(req.body, {
-    destinationSafetyService: req.app.locals.destinationSafetyService
+  const { transportResult } = await prepareAuditRequest(req.body, {
+    auditHttpClient: req.app.locals.auditHttpClient
   })
 
-  res.status(501).json(errorEnvelope({
+  res.status(200).json(successEnvelope({
     requestId: req.id,
-    code: 'AUDIT_PROCESSING_NOT_IMPLEMENTED',
-    message: 'URL validation succeeded, but audit processing is not implemented yet.',
-    details: [
-      {
-        field: 'url',
-        normalisedUrl
-      }
-    ]
+    data: {
+      requestedUrl: transportResult.requestedUrl,
+      finalUrl: transportResult.finalUrl,
+      httpStatus: transportResult.statusCode,
+      redirectCount: transportResult.redirectCount,
+      responseTimeMs: transportResult.responseTimeMs,
+      contentType: transportResult.contentType,
+      responseSizeBytes: transportResult.responseSizeBytes,
+      auditedAt: transportResult.auditedAt,
+      auditStatus: 'transport_complete'
+    }
   }))
 }

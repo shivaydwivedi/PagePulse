@@ -6,38 +6,66 @@ const testConfig = {
   NODE_ENV: 'test',
   PORT: 3000,
   LOG_LEVEL: 'info',
-  REQUEST_BODY_LIMIT: '16kb'
+  REQUEST_BODY_LIMIT: '16kb',
+  AUDIT_TIMEOUT_MS: 8000,
+  AUDIT_MAX_REDIRECTS: 5,
+  AUDIT_MAX_RESPONSE_BYTES: 1048576,
+  AUDIT_USER_AGENT: 'PagePulseBot/1.0'
 }
 
 function createTestApp() {
   return createApp({
     config: testConfig,
-    resolver: async () => [{ address: '93.184.216.34', family: 4 }]
+    auditHttpClient: {
+      async fetchAuditTarget(normalisedUrl) {
+        return {
+          requestedUrl: normalisedUrl,
+          finalUrl: normalisedUrl,
+          statusCode: 200,
+          headers: {
+            'content-type': 'text/html',
+            'set-cookie': 'session=secret',
+            'x-secret-debug': 'raw-upstream-value'
+          },
+          contentType: 'text/html',
+          responseSizeBytes: 12,
+          responseTimeMs: 7,
+          redirectCount: 0,
+          auditedAt: '2026-07-27T00:00:00.000Z',
+          body: Buffer.from('<h1>ok</h1>')
+        }
+      }
+    }
   })
 }
 
 describe('POST /api/v1/audits', () => {
-  it('returns the temporary 501 response for a valid URL', async () => {
+  it('returns a transport result for a valid URL', async () => {
     const response = await request(createTestApp())
       .post('/api/v1/audits')
       .send({ url: 'https://EXAMPLE.com:443/path?q=1#section' })
-      .expect(501)
+      .expect(200)
 
     expect(response.headers['x-request-id']).toEqual(expect.any(String))
     expect(response.body).toEqual({
-      success: false,
+      success: true,
       requestId: response.headers['x-request-id'],
-      error: {
-        code: 'AUDIT_PROCESSING_NOT_IMPLEMENTED',
-        message: 'URL validation succeeded, but audit processing is not implemented yet.',
-        details: [
-          {
-            field: 'url',
-            normalisedUrl: 'https://example.com/path?q=1'
-          }
-        ]
+      data: {
+        requestedUrl: 'https://example.com/path?q=1',
+        finalUrl: 'https://example.com/path?q=1',
+        httpStatus: 200,
+        redirectCount: 0,
+        responseTimeMs: 7,
+        contentType: 'text/html',
+        responseSizeBytes: 12,
+        auditedAt: '2026-07-27T00:00:00.000Z',
+        auditStatus: 'transport_complete'
       }
     })
+    expect(JSON.stringify(response.body)).not.toContain('<h1>ok</h1>')
+    expect(JSON.stringify(response.body)).not.toContain('session=secret')
+    expect(JSON.stringify(response.body)).not.toContain('raw-upstream-value')
+    expect(response.headers['set-cookie']).toBeUndefined()
   })
 
   it('propagates a valid incoming request ID', async () => {
@@ -45,7 +73,7 @@ describe('POST /api/v1/audits', () => {
       .post('/api/v1/audits')
       .set('X-Request-ID', 'phase2-request-id')
       .send({ url: 'https://example.com' })
-      .expect(501)
+      .expect(200)
 
     expect(response.headers['x-request-id']).toBe('phase2-request-id')
     expect(response.body.requestId).toBe('phase2-request-id')
