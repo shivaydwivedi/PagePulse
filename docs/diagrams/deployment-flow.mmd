@@ -1,0 +1,10 @@
+flowchart TD
+  GitHubMain["GitHub main branch"] --> Buildpack["Northflank Buildpack build"]
+  Buildpack --> Service["Northflank service: one instance"]
+  Service --> HTTPS["Public HTTPS endpoint"]
+  HTTPS --> Express["Express same-origin UI and API"]
+  Probe["Northflank health probes"] --> Health["GET /healthz"]
+  Health --> Express
+  Express --> Logs["Structured logs"]
+  Express --> Safety["Destination safety and HTTP client"]
+  Safety --> Target["Public target website"]

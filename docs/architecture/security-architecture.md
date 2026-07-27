@@ -23,6 +23,7 @@ The API client supplies a URL. PagePulse validates and normalises the URL, resol
 | Raw HTML exposure | Raw body and unsafe headers are excluded from public responses and cache payloads | Future response additions must preserve this boundary |
 | Error detail leakage | Public envelopes use sanitized `AppError` fields | Logs retain internal causes for operators |
 | Abuse of audit endpoint | Fixed-window rate limiting and semaphore bounds protect local resources | Not a DDoS defense or distributed WAF |
+| Browser-facing response handling | Manual security headers add CSP, nosniff, referrer policy, permissions policy, and frame protection | HSTS is deferred until deployed HTTPS behaviour is verified |
 | Secret file commits | `.gitignore`, CI hygiene, and contribution docs block common tracked paths | Not complete secret scanning |
 
 ## Implemented Controls
@@ -32,6 +33,10 @@ Strict scheme policy accepts only HTTP and HTTPS. IPv4 and IPv6 addresses are pa
 Environment secrets should be provided through `.env` locally or platform environment variables in production. `.env` files are ignored and `.env.example` is the only committed env template.
 
 CI runs high-severity `npm audit`, repository hygiene checks, committed whitespace checks, and dependency tree validation.
+
+First-party responses set `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and frame protection. The CSP permits same-origin CSS, module JavaScript, images, API calls, and the existing inline theme bootstrap. It does not require external runtime assets. `Strict-Transport-Security` is not set during local readiness because final HTTPS behaviour must be verified after Northflank deployment.
+
+`TRUST_PROXY` status for Northflank: Requires live verification. The final setting must be based on deployed evidence for `req.socket.remoteAddress`, `req.ip`, `req.ips`, and Northflank forwarding headers. Do not add permanent raw forwarding-header logging or a public diagnostic endpoint.
 
 ## Diagram
 

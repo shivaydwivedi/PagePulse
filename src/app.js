@@ -6,6 +6,7 @@ import { createLogger, createRequestLogger } from './infrastructure/logging/logg
 import { errorMiddleware } from './middleware/error.middleware.js'
 import { notFoundMiddleware } from './middleware/not-found.middleware.js'
 import { requestIdMiddleware } from './middleware/request-id.middleware.js'
+import { securityHeadersMiddleware } from './middleware/security-headers.middleware.js'
 import { auditRouter } from './routes/audit.routes.js'
 import { healthRouter } from './routes/health.routes.js'
 import { createAuditHttpClient } from './infrastructure/http/audit-http-client.js'
@@ -71,6 +72,7 @@ export function createApp(options = {}) {
   })
 
   app.disable('x-powered-by')
+  app.use(securityHeadersMiddleware)
   app.use(requestIdMiddleware)
   app.use(createRequestLogger(logger))
   app.get('/', (_req, res) => {

@@ -26,11 +26,20 @@ export const requiredDiagramFiles = [
   'docs/diagrams/cache-concurrency-flow.mmd',
   'docs/diagrams/rate-limit-flow.mmd',
   'docs/diagrams/error-handling-flow.mmd',
-  'docs/diagrams/ci-quality-flow.mmd'
+  'docs/diagrams/ci-quality-flow.mmd',
+  'docs/diagrams/deployment-flow.mmd'
 ]
 
 export const requiredPerformanceFiles = [
   'docs/performance/lighthouse-report.md'
+]
+
+export const requiredDeploymentFiles = [
+  'docs/deployment/README.md',
+  'docs/deployment/northflank-configuration.md',
+  'docs/deployment/production-environment.md',
+  'docs/deployment/operations-and-rollback.md',
+  'docs/deployment/post-deployment-verification.md'
 ]
 
 export const requiredScreenshotFiles = [
@@ -58,7 +67,12 @@ function hasUnsafeLocalPath(text) {
 
 export function validateDocumentationStructure() {
   const errors = []
-  const requiredFiles = [...requiredArchitectureFiles, ...requiredDiagramFiles, ...requiredPerformanceFiles]
+  const requiredFiles = [
+    ...requiredArchitectureFiles,
+    ...requiredDiagramFiles,
+    ...requiredPerformanceFiles,
+    ...requiredDeploymentFiles
+  ]
 
   for (const file of requiredFiles) {
     if (!existsSync(file)) {
@@ -123,6 +137,10 @@ export function validateDocumentationStructure() {
   }
 
   const rootReadme = existsSync('README.md') ? readText('README.md') : ''
+  if (rootReadme && !rootReadme.includes('docs/deployment/README.md')) {
+    errors.push('Root README does not link the deployment readiness documentation.')
+  }
+
   for (const file of requiredScreenshotFiles) {
     if (!existsSync(file)) {
       errors.push(`Missing required screenshot file: ${file}`)
@@ -143,6 +161,57 @@ export function validateDocumentationStructure() {
 
   if (performanceReport.includes('production field data') && !performanceReport.includes('not production field data')) {
     errors.push('Performance report must not claim production field data.')
+  }
+
+  const deploymentReadme = existsSync('docs/deployment/README.md') ? readText('docs/deployment/README.md') : ''
+  const northflankConfig = existsSync('docs/deployment/northflank-configuration.md') ? readText('docs/deployment/northflank-configuration.md') : ''
+  const productionEnv = existsSync('docs/deployment/production-environment.md') ? readText('docs/deployment/production-environment.md') : ''
+  const rollback = existsSync('docs/deployment/operations-and-rollback.md') ? readText('docs/deployment/operations-and-rollback.md') : ''
+  const verification = existsSync('docs/deployment/post-deployment-verification.md') ? readText('docs/deployment/post-deployment-verification.md') : ''
+  const deploymentCombined = [deploymentReadme, northflankConfig, productionEnv, rollback, verification].join('\n')
+
+  for (const requiredText of [
+    'Status: Prepared',
+    'not live',
+    'Requires live verification',
+    'rollback',
+    'post-deployment',
+    'Buildpack',
+    'Instances',
+    'No database',
+    'No volume'
+  ]) {
+    if (!deploymentCombined.includes(requiredText)) {
+      errors.push(`Deployment documentation is missing required text: ${requiredText}`)
+    }
+  }
+
+  if (!deploymentCombined.includes('TRUST_PROXY') || !deploymentCombined.includes('Pending')) {
+    errors.push('Deployment documentation must mark TRUST_PROXY as pending live verification.')
+  }
+
+  if (!verification.includes('generated HTTPS URL')) {
+    errors.push('Post-deployment checklist must include generated HTTPS URL verification.')
+  }
+
+  if (!verification.includes('Rate-limit headers')) {
+    errors.push('Post-deployment checklist must include rate-limit header verification.')
+  }
+
+  if (!rollback.includes('Git revert rollback') || !rollback.includes('Northflank rollback')) {
+    errors.push('Rollback documentation must include Northflank and Git revert paths.')
+  }
+
+  if (/card (number|data)|credit card number|payment card number/i.test(deploymentCombined)) {
+    errors.push('Deployment documentation must not include payment card data.')
+  }
+
+  if (/https:\/\/(pagepulse|[^ \n)]+northflank)[^ \n)]*/i.test(deploymentCombined)) {
+    errors.push('Deployment documentation must not present a live deployment URL.')
+  }
+
+  if (/(secret|token|password)\s*[:=]\s*\S+/i.test(deploymentCombined)) {
+    errors.push('Deployment documentation must not include provider secrets.')
   }
 
   return errors

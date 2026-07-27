@@ -36,6 +36,67 @@ describe('public UI structure', () => {
     expect(missing.body.error.code).toBe('NOT_FOUND')
   })
 
+  it('sets first-party security headers without breaking the public UI or JSON routes', async () => {
+    const app = createApp({ config: testConfig })
+
+    const root = await request(app).get('/').expect(200)
+    const health = await request(app).get('/healthz').expect(200)
+    const script = await request(app).get('/app.js').expect(200)
+
+    for (const response of [root, health, script]) {
+      expect(response.headers['content-security-policy']).toContain("default-src 'self'")
+      expect(response.headers['content-security-policy']).toContain("script-src 'self' 'unsafe-inline'")
+      expect(response.headers['content-security-policy']).toContain("frame-ancestors 'none'")
+      expect(response.headers['x-content-type-options']).toBe('nosniff')
+      expect(response.headers['referrer-policy']).toBe('strict-origin-when-cross-origin')
+      expect(response.headers['permissions-policy']).toContain('geolocation=()')
+      expect(response.headers['x-frame-options']).toBe('DENY')
+      expect(response.headers['strict-transport-security']).toBeUndefined()
+    }
+  })
+
+  it('keeps health checks lightweight and outside audit-only local state', async () => {
+    const app = createApp({
+      config: testConfig,
+      auditCache: {
+        get() {
+          throw new Error('health must not touch cache')
+        }
+      },
+      auditSemaphore: {
+        acquire() {
+          throw new Error('health must not acquire semaphore')
+        }
+      },
+      auditRateLimiter: {
+        consume() {
+          throw new Error('health must not consume rate limit')
+        }
+      },
+      auditHttpClient: {
+        fetchAuditTarget() {
+          throw new Error('health must not fetch')
+        }
+      },
+      destinationSafetyService: {
+        validate() {
+          throw new Error('health must not resolve')
+        }
+      }
+    })
+
+    const response = await request(app)
+      .get('/healthz')
+      .expect(200)
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        status: 'ok'
+      }
+    })
+  })
+
   it('includes accessible initial HTML, metadata, form, noscript copy, and attribution', () => {
     const html = readText('public/index.html')
 
