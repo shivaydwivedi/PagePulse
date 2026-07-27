@@ -57,6 +57,7 @@ describe('POST /api/v1/audits', () => {
       .expect(200)
 
     expect(response.headers['x-request-id']).toEqual(expect.any(String))
+    expect(response.headers['x-cache']).toBe('MISS')
     expect(response.body).toEqual({
       success: true,
       requestId: response.headers['x-request-id'],
@@ -70,6 +71,7 @@ describe('POST /api/v1/audits', () => {
         responseSizeBytes: 12,
         auditedAt: '2026-07-27T00:00:00.000Z',
         auditStatus: 'complete',
+        cached: false,
         score: 91,
         grade: 'A',
         scoring: {
