@@ -1,4 +1,6 @@
 import express from 'express'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseEnv } from './config/env.js'
 import { createLogger, createRequestLogger } from './infrastructure/logging/logger.js'
 import { errorMiddleware } from './middleware/error.middleware.js'
@@ -13,6 +15,8 @@ import { createFixedWindowRateLimiter } from './infrastructure/rate-limit/fixed-
 import { createDestinationSafetyService } from './services/destination-safety.service.js'
 import { createHtmlAnalysisService } from './services/html-analysis.service.js'
 import { auditScorer } from './scoring/audit-scorer.js'
+
+const publicDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public')
 
 export function createApp(options = {}) {
   const config = options.config ?? parseEnv()
@@ -69,6 +73,18 @@ export function createApp(options = {}) {
   app.disable('x-powered-by')
   app.use(requestIdMiddleware)
   app.use(createRequestLogger(logger))
+  app.get('/', (_req, res) => {
+    res.set('Cache-Control', 'no-cache')
+    res.sendFile(path.join(publicDirectory, 'index.html'))
+  })
+  app.use(express.static(publicDirectory, {
+    index: false,
+    fallthrough: true,
+    dotfiles: 'ignore',
+    setHeaders(res) {
+      res.set('Cache-Control', 'no-cache')
+    }
+  }))
   app.use(healthRouter)
   app.use(auditRouter)
   app.use(notFoundMiddleware)

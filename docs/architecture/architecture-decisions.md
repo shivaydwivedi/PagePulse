@@ -140,3 +140,12 @@ Back to the [architecture index](README.md).
 - Reason: Text diffs are simple and no binary assets are needed.
 - Consequences: Rendered images are not committed.
 - Future reconsideration trigger: A publishing pipeline needs generated artifacts.
+
+## ADR-016 Plain HTML CSS And JavaScript For Public UI
+
+- Decision: Build the Phase 10 public demo UI with plain HTML, CSS, and browser JavaScript.
+- Context: The project needs a lightweight recruiter-facing interface without changing backend behaviour or adding frontend tooling.
+- Choice: Serve static files from the existing Express app and call the audit API through same-origin `fetch`.
+- Reason: Keeps the page small, LCP-conscious, easy to review, and free of framework or build dependencies.
+- Consequences: UI state and rendering helpers are maintained manually.
+- Future reconsideration trigger: The frontend grows into a multi-page application or needs a build pipeline.

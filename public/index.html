@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" data-theme-mode="system">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Run a focused audit of a public web page's metadata, structure, accessibility signals, links and security headers.">
+    <meta name="theme-color" content="#f6f3ee">
+    <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#151816" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="light dark">
+    <title>PagePulse - Focused Website Audit</title>
+    <script>
+      (() => {
+        const key = 'pagepulse.theme'
+        const allowed = new Set(['light', 'dark', 'system'])
+        let mode = 'system'
+        try {
+          const stored = localStorage.getItem(key)
+          if (allowed.has(stored)) mode = stored
+        } catch {}
+        const resolved = mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : mode === 'dark' ? 'dark' : 'light'
+        document.documentElement.dataset.themeMode = mode
+        document.documentElement.dataset.theme = resolved
+      })()
+    </script>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+    <link rel="modulepreload" href="/ui-core.js">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to audit form</a>
+    <header class="site-header">
+      <div class="brand" aria-label="PagePulse">
+        <img src="/assets/pagepulse-mark.svg" width="48" height="48" alt="" aria-hidden="true">
+        <div>
+          <p class="wordmark">PagePulse</p>
+          <p class="descriptor">Focused page audit</p>
+        </div>
+      </div>
+      <fieldset class="theme-control" aria-label="Theme">
+        <legend>Theme</legend>
+        <label><input type="radio" name="theme" value="light"> Light</label>
+        <label><input type="radio" name="theme" value="dark"> Dark</label>
+        <label><input type="radio" name="theme" value="system" checked> System</label>
+      </fieldset>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="intro" aria-labelledby="intro-title">
+        <p class="eyebrow">Project-specific website audit</p>
+        <h1 id="intro-title">See what your page gets right—and what needs attention.</h1>
+        <p class="lede">Paste a public page URL to run a focused audit across structure, metadata, links, accessibility signals and security headers.</p>
+      </section>
+
+      <section class="audit-panel" aria-labelledby="form-title">
+        <form id="audit-form" novalidate>
+          <div class="form-copy">
+            <h2 id="form-title">Audit a public page</h2>
+            <p id="url-help">PagePulse audits public page responses. Do not submit private, local or credential-bearing URLs.</p>
+          </div>
+          <div class="field-row">
+            <label for="audit-url">Page URL</label>
+            <div class="input-row">
+              <input id="audit-url" name="url" type="url" placeholder="https://example.com" autocomplete="off" spellcheck="false" aria-describedby="url-help url-error">
+              <button id="submit-button" type="submit">Run audit</button>
+            </div>
+            <p id="url-error" class="field-error" role="alert"></p>
+          </div>
+          <button class="example-button" type="button" data-example-url="https://example.com">Use example URL</button>
+        </form>
+      </section>
+
+      <section id="status-region" class="status-region" aria-live="polite" aria-busy="false">
+        <div id="idle-state" class="state-block" data-state-panel="idle">
+          <h2>What the audit checks</h2>
+          <ul class="check-preview" aria-label="PagePulse check groups">
+            <li><span>Structure</span><strong>Headings, language and viewport</strong></li>
+            <li><span>Metadata</span><strong>Title, description and canonical URL</strong></li>
+            <li><span>Page hygiene</span><strong>Images, links and safe public bounds</strong></li>
+            <li><span>Headers</span><strong>Security header signals</strong></li>
+          </ul>
+        </div>
+
+        <div id="loading-state" class="state-block loading-state" data-state-panel="loading" hidden tabindex="-1">
+          <div class="progress-line" aria-hidden="true"><span></span></div>
+          <h2>Reviewing the page...</h2>
+          <p>Audits may take a few seconds while PagePulse validates the destination and reads a bounded HTML response.</p>
+          <p class="submitted-url" data-loading-url></p>
+        </div>
+
+        <section id="result-state" class="state-block result-state" data-state-panel="success" hidden tabindex="-1" aria-labelledby="result-title">
+          <div class="result-heading">
+            <div>
+              <p class="eyebrow">Audit result</p>
+              <h2 id="result-title">PagePulse report</h2>
+              <p class="score-note">PagePulse score uses project-specific checks and weighting.</p>
+            </div>
+            <div class="score-box" aria-label="Score summary">
+              <strong data-score>0</strong>
+              <span data-grade>Grade</span>
+            </div>
+          </div>
+          <div class="summary-grid" data-summary-grid></div>
+          <section aria-labelledby="checks-title">
+            <h3 id="checks-title">Checks</h3>
+            <div class="status-counts" data-status-counts></div>
+            <div class="check-list" data-check-list></div>
+          </section>
+          <section aria-labelledby="issues-title">
+            <h3 id="issues-title">Issues</h3>
+            <div data-issue-list></div>
+          </section>
+          <section aria-labelledby="technical-title">
+            <h3 id="technical-title">Technical details</h3>
+            <dl class="metadata-grid" data-technical-metadata></dl>
+            <p class="copy-status" data-copy-status aria-live="polite"></p>
+          </section>
+        </section>
+
+        <section id="error-state" class="state-block error-state" data-state-panel="error" hidden tabindex="-1" aria-labelledby="error-title">
+          <p class="eyebrow">Audit interrupted</p>
+          <h2 id="error-title" data-error-title>Something needs attention.</h2>
+          <p data-error-message></p>
+          <dl class="metadata-grid compact" data-error-metadata></dl>
+          <button type="button" data-retry-button>Retry audit</button>
+          <p class="retry-note" data-retry-note aria-live="polite"></p>
+        </section>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Built for <a href="https://digitalheroesco.com" target="_blank" rel="noopener noreferrer">Digital Heroes Training Task</a></p>
+      <p>Focused audits only. No Lighthouse, browser rendering or Core Web Vitals measurement is claimed.</p>
+    </footer>
+
+    <noscript>
+      <p class="noscript-message">PagePulse needs JavaScript to submit and display audits.</p>
+    </noscript>
+  </body>
+</html>

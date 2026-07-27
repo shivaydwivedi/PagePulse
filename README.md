@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources.
+Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources. Phase 10 adds a lightweight public demo UI served by the existing Express application.
 
-The CI workflow is configured and will run on pushes and pull requests after this branch is merged. Deployment and the public demonstration interface remain pending.
+The CI workflow is configured and will run on pushes and pull requests after this branch is merged. The public demonstration UI is implemented; deployment remains pending.
 
 ## Technology Stack
 
@@ -91,6 +91,20 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 - `npm run check:docs`: verify required architecture documentation and diagram structure
 - `npm run ci`: run the local CI-equivalent lint, coverage, documentation, and hygiene checks
 
+## Public Demo UI
+
+Run the app locally and open [http://localhost:3000/](http://localhost:3000/) to use the PagePulse demo interface.
+
+The UI is built with plain HTML, CSS and browser JavaScript. It provides a public URL audit form, idle/loading/success/error states, score and grade display, page metadata, stable check rows, issue details, technical metadata, copy actions, and clear handling for cache hits, rate limits, capacity errors, transport failures, and unexpected API responses. Browser retry countdowns use `Retry-After` seconds and are capped at one hour.
+
+Theme modes are Light, Dark and System. Explicit choices are stored under `pagepulse.theme`; the UI stores only the most recently submitted URL under `pagepulse.lastUrl` for convenience.
+
+Accessibility features include semantic landmarks, a skip link, visible labels, keyboard-accessible controls, focus states, `aria-live` status messaging, `aria-busy` during audits, non-colour-only statuses, responsive wrapping, and reduced-motion support.
+
+The page is LCP-conscious by construction: the main heading and form are in initial HTML, JavaScript is module-loaded, there are no remote fonts, no external scripts or stylesheets, no frontend framework, no chart library, and no raster assets. Lighthouse measurement is pending and no measured LCP claim is made in this phase.
+
+The footer visibly includes the required `Built for Digital Heroes Training Task` attribution linking to `https://digitalheroesco.com`.
+
 ## Architecture Documentation
 
 Detailed architecture notes live in [docs/architecture/README.md](docs/architecture/README.md), with reusable Mermaid sources in [docs/diagrams/README.md](docs/diagrams/README.md).
@@ -106,7 +120,7 @@ Key documents:
 - [CI and quality gates](docs/architecture/ci-and-quality-gates.md)
 - [Architecture decisions](docs/architecture/architecture-decisions.md)
 
-Future frontend and deployment architecture documents are planning documents only; no frontend framework, hosting provider, or deployed environment has been selected.
+Frontend architecture is implemented for the current plain HTML, CSS and JavaScript UI. Deployment architecture remains planned only; no hosting provider or deployed environment has been selected.
 
 ## Project Structure
 

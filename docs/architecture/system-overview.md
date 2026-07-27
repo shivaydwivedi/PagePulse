@@ -2,13 +2,15 @@
 
 Status: Implemented
 
-PagePulse is a Node.js 22 Express API that accepts an audit request from an API client, safely fetches one HTML page, analyses bounded page signals, scores the result, and returns a sanitized JSON envelope. The current system has no database and keeps cache, concurrency, and rate-limit state in process memory.
+PagePulse is a Node.js 22 Express application that serves a lightweight public demo UI and a JSON audit API. The UI submits same-origin audit requests from the browser. The API safely fetches one HTML page, analyses bounded page signals, scores the result, and returns a sanitized JSON envelope. The current system has no database and keeps cache, concurrency, and rate-limit state in process memory.
 
 Back to the [architecture index](README.md). Diagram source: [system-context.mmd](../diagrams/system-context.mmd).
 
 ```mermaid
 flowchart TD
-  APIClient[API Client] --> ExpressAPI[PagePulse Express API]
+  Browser[Browser UI] --> ExpressAPI[PagePulse Express App]
+  APIClient[API Client] --> ExpressAPI
+  ExpressAPI --> StaticUI[Static public files]
   ExpressAPI --> RequestID[Request ID]
   ExpressAPI --> RateLimiter[Rate Limiter]
   RateLimiter --> Cache[Cache]
@@ -26,6 +28,7 @@ flowchart TD
 
 | Component | Source | Responsibility |
 | --- | --- | --- |
+| Public UI | [public/index.html](../../public/index.html), [public/styles.css](../../public/styles.css), [public/app.js](../../public/app.js) | Provides the recruiter-facing audit form, theme controls, result rendering, and error states |
 | Express app | [src/app.js](../../src/app.js) | Composes middleware, routers, and injectable services |
 | Server entrypoint | [src/server.js](../../src/server.js) | Starts HTTP server and handles graceful shutdown |
 | Request ID middleware | [src/middleware/request-id.middleware.js](../../src/middleware/request-id.middleware.js) | Accepts safe request IDs or generates new IDs |
@@ -40,7 +43,7 @@ flowchart TD
 
 ## Responsibility Boundaries
 
-The API layer owns HTTP routing, headers, request IDs, parsing, and public envelopes. The service layer owns audit orchestration and cache/semaphore coordination. Destination safety and transport are separate so URL approval is performed before each outbound connection. Analysis and scoring do not fetch linked resources.
+The public UI owns browser-side presentation, same-origin API calls, theme preference, and safe DOM rendering. The API layer owns HTTP routing, headers, request IDs, parsing, and public envelopes. The service layer owns audit orchestration and cache/semaphore coordination. Destination safety and transport are separate so URL approval is performed before each outbound connection. Analysis and scoring do not fetch linked resources.
 
 ## Process-Local State
 
@@ -48,4 +51,4 @@ The TTL cache, semaphore, and fixed-window rate limiter are process-local. They 
 
 ## Current Limitations
 
-PagePulse is not deployed in this phase, does not include a public UI, does not use a database, and does not provide distributed cache or distributed rate limiting. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.
+PagePulse is not deployed in this phase, does not use a database, and does not provide distributed cache or distributed rate limiting. The public UI has not received Lighthouse measurement yet. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.
