@@ -8,3 +8,6 @@ coverage/
 npm-debug.log*
 *.log
 .DS_Store
+
+# Local VS Code settings
+.vscode/
