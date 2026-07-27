@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a focused improvement for PagePulse.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or maintainer problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful version of the feature.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider?
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Note affected endpoints, configuration, documentation, or tests.
+  - type: textarea
+    id: security-performance
+    attributes:
+      label: Security and performance considerations
+      description: Note possible SSRF, rate-limit, cache, concurrency, dependency, or response-contract impact.

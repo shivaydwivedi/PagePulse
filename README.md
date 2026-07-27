@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 8 adds configurable per-client fixed-window rate limiting for the audit endpoint on top of bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, and HTML analysis. The API now rate-limits audit attempts, validates and normalises audit URLs, checks the cache, bounds concurrent cache-miss audits, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, issues, and calculates a transparent project-specific PagePulse score.
+Phase 9 adds local GitHub Actions CI configuration and repository quality gates on top of configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, and HTML analysis. The API rate-limits audit attempts, validates and normalises audit URLs, checks the cache, bounds concurrent cache-miss audits, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, issues, and calculates a transparent project-specific PagePulse score.
 
-CI, deployment, and the public demonstration interface are not implemented yet.
+The CI workflow is configured and will run on pushes and pull requests after this branch is merged. Deployment and the public demonstration interface remain pending.
 
 ## Technology Stack
 
@@ -29,7 +29,7 @@ CI, deployment, and the public demonstration interface are not implemented yet.
 ## Local Setup
 
 ```bash
-npm install
+npm ci
 npm run check
 npm start
 ```
@@ -87,6 +87,63 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 - `npm run coverage`: run tests with coverage
 - `npm run lint`: run ESLint
 - `npm run check`: run lint and tests
+- `npm run check:hygiene`: reject commonly sensitive or generated tracked files
+- `npm run ci`: run the local CI-equivalent lint, coverage, and hygiene checks
+
+## Continuous Integration
+
+Phase 9 adds `.github/workflows/ci.yml`, a GitHub Actions workflow named `CI`. It is configured for pull requests targeting `main`, pushes to `main`, and manual `workflow_dispatch` runs. It does not deploy PagePulse.
+
+The workflow uses:
+
+- `ubuntu-latest`
+- Node.js `22`
+- `actions/checkout@v4` with `persist-credentials: false`
+- `actions/setup-node@v4` with npm caching keyed by `package-lock.json`
+- minimum repository permissions: `contents: read`
+- concurrency cancellation for outdated runs on the same ref
+
+CI quality gates:
+
+- `npm ci` for clean lockfile-based installation
+- `npm run lint`
+- `npm run coverage`
+- `npm run check:hygiene`
+- `npm ls --depth=0`
+- `npm audit --audit-level=high`
+- event-aware committed-diff whitespace validation for pull requests, pushes, and manual runs
+- `git diff --check` after commands complete, to detect generated working-tree whitespace errors
+- `git diff --exit-code -- package.json package-lock.json`
+- `git status --short` after verification
+
+Coverage is enforced by Vitest across `src/**/*.js` with global minimums of statements 90%, branches 85%, functions 90%, and lines 90%. Coverage reporters are `text`, `json-summary`, and `lcov`; generated `coverage/` output is ignored and should not be committed.
+
+The dependency audit policy blocks high and critical vulnerability findings. Lower-severity findings should still be reviewed, but the workflow threshold is intentionally set to `high` to avoid noisy failures during this phase. CI does not run `npm audit fix` or modify dependencies.
+
+The repository hygiene check uses `git ls-files` to reject commonly sensitive or generated tracked paths such as `.env`, `.env.local`, `.env.production`, `.env.development`, `node_modules/`, `coverage/`, `*.log`, `*.pem`, `*.key`, `id_rsa`, and `id_ed25519`. Matching is case-insensitive and `.env.example` is allowed. This is a lightweight path check, not a replacement for dedicated secret scanning.
+
+The workflow has been verified locally, but the remote GitHub Actions run has not been proven until the first push or pull request executes it on GitHub.
+
+Recommended branch protection for `main`:
+
+- require a pull request before merging
+- require the CI status check before merging
+- require branches to be up to date before merging
+- block force pushes
+- block branch deletion
+- require conversation resolution
+
+Local CI-equivalent commands:
+
+```powershell
+npm ci
+npm run lint
+npm run coverage
+npm run check:hygiene
+npm ls --depth=0
+npm audit --audit-level=high
+git diff --check
+```
 
 ## Current Endpoints
 

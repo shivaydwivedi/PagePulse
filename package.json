@@ -14,7 +14,9 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "check:hygiene": "node scripts/check-repository-hygiene.js",
+    "ci": "npm run lint && npm run coverage && npm run check:hygiene"
   },
   "dependencies": {
     "cheerio": "1.1.2",
