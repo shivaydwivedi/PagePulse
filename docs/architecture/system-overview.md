@@ -51,4 +51,4 @@ The TTL cache, semaphore, queue, and fixed-window rate limiter are process-local
 
 ## Current Limitations
 
-PagePulse is prepared for Render but is not live, does not use a database, and does not provide distributed cache or distributed rate limiting. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.
+PagePulse is live on Render at `https://pagepulse-3gub.onrender.com`. It does not use a database and does not provide distributed cache or distributed rate limiting. Cache, queue, semaphore, and rate-limit state are process-local and reset when Render restarts or cold-starts the service.

@@ -23,7 +23,7 @@ The API client supplies a URL. PagePulse validates and normalises the URL, resol
 | Raw HTML exposure | Raw body and unsafe headers are excluded from public responses and cache payloads | Future response additions must preserve this boundary |
 | Error detail leakage | Public envelopes use sanitized `AppError` fields | Logs retain internal causes for operators |
 | Abuse of audit endpoint | Fixed-window rate limiting and semaphore bounds protect local resources | Not a DDoS defense or distributed WAF |
-| Browser-facing response handling | Manual security headers add CSP, nosniff, referrer policy, permissions policy, and frame protection | HSTS is deferred until deployed HTTPS behaviour is verified |
+| Browser-facing response handling | Manual security headers add CSP, nosniff, referrer policy, permissions policy, frame protection, and production-only HSTS | HSTS is conservative and does not include preload or subdomains |
 | Secret file commits | `.gitignore`, CI hygiene, and contribution docs block common tracked paths | Not complete secret scanning |
 
 ## Implemented Controls
@@ -34,9 +34,9 @@ Environment secrets should be provided through `.env` locally or platform enviro
 
 CI runs high-severity `npm audit`, repository hygiene checks, committed whitespace checks, and dependency tree validation.
 
-First-party responses set `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and frame protection. The CSP permits same-origin CSS, module JavaScript, images, API calls, and the existing inline theme bootstrap. It does not require external runtime assets. `Strict-Transport-Security` is not set during local readiness because final HTTPS behaviour must be verified after Render deployment; after live verification, HSTS may be considered without preload.
+First-party responses set `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and frame protection. The CSP permits same-origin CSS, module JavaScript, images, API calls, and the existing inline theme bootstrap. It does not require external runtime assets. Production responses also set `Strict-Transport-Security: max-age=2592000`; local development and test responses do not set HSTS.
 
-`TRUST_PROXY` status for Render: Requires live verification. The final setting must be based on deployed evidence for `req.socket.remoteAddress`, `req.ip`, `req.ips`, `X-Forwarded-For` handling, distinct client rate-limit buckets, and spoofed forwarding-input behaviour. Do not add permanent raw forwarding-header logging or a public diagnostic endpoint.
+`TRUST_PROXY` status for Render: left unset. There is insufficient evidence to configure a specific trusted proxy hop count safely, so current rate limiting uses the direct Render proxy-facing address behaviour. Proxy-aware per-end-user client identity requires separately verified deployment topology and spoofing checks. Do not add permanent raw forwarding-header logging or a public diagnostic endpoint.
 
 ## Diagram
 

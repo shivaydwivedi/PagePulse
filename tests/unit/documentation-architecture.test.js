@@ -6,6 +6,7 @@ import {
   requiredDiagramFiles,
   requiredPerformanceFiles,
   requiredScreenshotFiles,
+  liveRenderUrl,
   validateDocumentationStructure
 } from '../../scripts/check-documentation-links.js'
 
@@ -75,7 +76,7 @@ describe('architecture documentation structure', () => {
     }
   })
 
-  it('labels frontend as implemented and deployment as prepared without claiming live deployment', () => {
+  it('labels frontend and deployment as implemented with the live Render URL', () => {
     const frontend = readText('docs/architecture/future-frontend-architecture.md')
     const deployment = readText('docs/architecture/future-deployment-architecture.md')
     const rootReadme = readText('README.md')
@@ -84,13 +85,12 @@ describe('architecture documentation structure', () => {
     expect(frontend).toContain('No frontend framework')
     expect(frontend).toContain('Phase 10B measured')
     expect(frontend).toContain('not production field data')
-    expect(deployment).toContain('Status: Prepared')
-    expect(deployment).toContain('not live')
+    expect(deployment).toContain('Status: Implemented')
+    expect(deployment).toContain(liveRenderUrl)
     expect(deployment).toContain('Render')
-    expect(rootReadme).toContain('Status: Prepared, not live')
-    expect(rootReadme).toContain('Live URL: pending')
-    expect(rootReadme).toContain('Provider selected: Render')
-    expect(rootReadme).not.toMatch(/https:\/\/[^ \n)]+onrender\.com/i)
+    expect(rootReadme).toContain('Status: Implemented')
+    expect(rootReadme).toContain(liveRenderUrl)
+    expect(rootReadme).toContain('Provider: Render')
   })
 
   it('documents critical implemented architecture facts', () => {
@@ -129,7 +129,7 @@ describe('architecture documentation structure', () => {
     expect(validateDocumentationStructure()).toEqual([])
   })
 
-  it('documents Render Web Service readiness without adding live infrastructure claims', () => {
+  it('documents the implemented Render Web Service model without private provider data', () => {
     const config = readText('docs/deployment/render-configuration.md')
     const deployment = readText('docs/architecture/future-deployment-architecture.md')
     const diagram = readText('docs/diagrams/deployment-flow.mmd')
@@ -144,56 +144,98 @@ describe('architecture documentation structure', () => {
     expect(config).toContain('Start command | `npm start`')
     expect(config).toContain('Health check path | `/healthz`')
     expect(config).toContain('Instance type | `Free`')
-    expect(config).toContain('Render supplies `PORT` automatically')
+    expect(config).toContain('observed as `10000`')
+    expect(config).toContain('Auto-deploy')
     expect(config).toContain('No database')
     expect(config).toContain('No persistent disk')
     expect(config).not.toMatch(/card (number|data)/i)
     expect(deployment).toContain('Render-managed HTTPS')
-    expect(deployment).toContain('same-origin UI/API')
+    expect(deployment).toContain('Same-origin UI/API')
     expect(deployment).toContain('cold start')
-    expect(diagram).toContain('Render build and deploy')
+    expect(deployment).toContain('Strict-Transport-Security')
+    expect(diagram).toContain('Render build: npm ci')
+    expect(diagram).toContain(liveRenderUrl)
     expect(diagram).toContain('Render-managed HTTPS')
     expect(diagram).not.toContain('Northflank')
     expect(diagram).not.toContain('Database')
   })
 
-  it('documents production runtime policy, Render health checks, TRUST_PROXY verification, and rollback', () => {
+  it('documents production runtime policy, Render health checks, TRUST_PROXY, HSTS, and rollback', () => {
     const env = readText('docs/deployment/production-environment.md')
     const config = readText('docs/deployment/render-configuration.md')
     const rollback = readText('docs/deployment/operations-and-rollback.md')
     const verification = readText('docs/deployment/post-deployment-verification.md')
+    const report = readText('docs/deployment/production-verification-report.md')
     const packageJson = JSON.parse(readText('package.json'))
 
     expect(packageJson.engines.node).toBe('>=22 <25')
     expect(env).toContain('| `PORT` |')
-    expect(env).toContain('Render-managed; do not set manually unless proven necessary')
+    expect(env).toContain('observed as `10000`')
     expect(env).toContain('| `NODE_ENV` |')
     expect(env).toContain('`production`')
     expect(env).toContain('| `LOG_LEVEL` |')
-    expect(env).toContain('Requires live verification')
-    expect(env).toContain('X-Forwarded-For')
+    expect(env).toContain('Final status: left unset')
+    expect(env).toContain('max-age=2592000')
     expect(env).toContain('No database')
     expect(config).toContain('Health check path | `/healthz`')
-    expect(config).toContain('No port field is needed')
+    expect(config).toContain('Leave `PORT` unset')
     expect(rollback).toContain('Render rollback')
     expect(rollback).toContain('Git revert rollback')
     expect(rollback).toContain('disable automatic deploys')
-    expect(verification).toContain('generated onrender.com HTTPS URL')
+    expect(verification).toContain(liveRenderUrl)
     expect(verification).toContain('Rate-limit headers')
     expect(verification).toContain('cache hit')
     expect(verification).toContain('HSTS')
     expect(verification).toContain('Digital Heroes Training Task')
+    expect(report).toContain('Production Verification Report')
+    expect(report).toContain('https://www.wikipedia.org')
+    expect(report).toContain('https://www.youtube.com')
+    expect(report).toContain('http://127.0.0.1')
+    expect(report).toContain('BLOCKED_TARGET')
   })
 
-  it('keeps deployment docs free of fake URLs, provider secrets, and card data', () => {
+  it('keeps deployment docs free of stale provider wording, fake URLs, provider secrets, and card data', () => {
     for (const file of requiredDeploymentFiles) {
       const text = readText(file)
 
-      expect(text, file).not.toMatch(/https:\/\/[^ \n)]+(?:northflank|onrender\.com)/i)
+      expect(text, file).not.toMatch(/https:\/\/(?!pagepulse-3gub\.onrender\.com)[^ \n)]+onrender\.com/i)
       expect(text, file).not.toMatch(/Northflank|northflank/i)
+      expect(text, file).not.toMatch(/Live URL:\s*pending/i)
+      expect(text, file).not.toMatch(/Status:\s*Prepared,\s*not live/i)
+      expect(text, file).not.toMatch(/Requires live verification/i)
       expect(text, file).not.toMatch(/card (number|data)/i)
       expect(text, file).not.toMatch(/(secret|token|password)\s*[:=]\s*\S+/i)
+      expect(text, file).not.toMatch(/srv-[a-z0-9]{8,}/i)
     }
+  })
+
+  it('documents final README positioning, architecture flow, attribution, and unsupported claims', () => {
+    const rootReadme = readText('README.md')
+
+    expect(rootReadme).toContain('security-focused server-side web-page audit service')
+    expect(rootReadme).toContain('public HTTP and HTTPS pages')
+    expect(rootReadme).toContain('SSRF-aware')
+    expect(rootReadme).toContain('not Lighthouse')
+    expect(rootReadme).toContain('not a browser-rendering engine')
+    expect(rootReadme).toContain('not a Core Web Vitals measurement service')
+    expect(rootReadme).toContain('bounded semaphore and queue')
+    expect(rootReadme).toContain('DNS resolution and approved-address transport')
+    expect(rootReadme).toContain('redirect revalidation')
+    expect(rootReadme).toContain('Provider: Render')
+    expect(rootReadme).toContain('HSTS')
+    expect(rootReadme).toContain('Digital Heroes Training Task')
+    expect(rootReadme).not.toMatch(/enterprise-grade|bulletproof|fully secure|infinitely scalable|production-proven|industry-leading/i)
+  })
+
+  it('links production documentation and favicon assets', () => {
+    const rootReadme = readText('README.md')
+    const index = readText('public/index.html')
+
+    expect(rootReadme).toContain('docs/deployment/production-verification-report.md')
+    expect(rootReadme).toContain('docs/deployment/render-configuration.md')
+    expect(rootReadme).toContain('docs/deployment/operations-and-rollback.md')
+    expect(existsSync('public/favicon.svg')).toBe(true)
+    expect(index).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">')
   })
 
   it('documents Lighthouse lab conditions and median results without production claims', () => {

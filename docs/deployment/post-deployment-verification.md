@@ -1,57 +1,58 @@
 # Post-Deployment Verification
 
-Status: Pending live deployment
+Status: Implemented
 
-Run this checklist only after Render has created the generated onrender.com HTTPS URL. Do not invent a URL before the service exists.
+Live URL: https://pagepulse-3gub.onrender.com
+
+This checklist records evidence-backed checks for the current Render deployment and should be repeated after deploys, rollbacks, or environment changes.
 
 ## Functional Checks
 
-- Generated onrender.com HTTPS URL opens the root UI.
-- `GET /` returns `200` and HTML.
-- `GET /styles.css`, `GET /app.js`, `GET /ui-core.js`, and `GET /assets/pagepulse-mark.svg` return `200`.
-- `GET /healthz` returns `200` JSON with `success: true`.
-- Unknown `/api/...` route returns JSON `404`.
-- Unknown non-API path preserves the intended JSON `404` behaviour.
-- `POST /api/v1/audits` handles a safe public audit target using `https://example.com`.
-- Blocked target returns the expected blocked-target error without transport.
-- Validation error returns a sanitized JSON error envelope.
-- `X-Request-ID` propagates when valid and is generated when absent.
-- Rate-limit headers appear on audit attempts.
-- A repeated safe audit can produce a cache hit when cache defaults remain enabled.
-- Render logs show structured startup and request entries.
-- Render health check status is healthy.
-- Cold-start delay after inactivity is observed and documented.
-- Footer shows `Built for Digital Heroes Training Task`.
-
-## Proxy And IP Verification
-
-Status: Requires live verification
-
-Compare temporary diagnostic evidence for:
-
-- `req.socket.remoteAddress`
-- `req.ip`
-- `req.ips`
-- `X-Forwarded-For` handling
-- whether distinct clients receive distinct rate-limit buckets
-- whether spoofed forwarding input can influence identity
-
-Do not add a public debugging endpoint. Do not log raw forwarding headers permanently. Any temporary diagnostic logging must be separately authorised, safely redacted, and removed afterward.
+- PASS: Generated Render HTTPS URL opens the root UI.
+- PASS: `GET /` returns `200` and HTML.
+- PASS: Static CSS and JavaScript assets return `200`.
+- PASS: `GET /healthz` returns `200` JSON with `success: true`.
+- PASS: `POST /api/v1/audits` audits `https://example.com`.
+- PASS: `POST /api/v1/audits` audits `https://www.wikipedia.org`.
+- PASS: `POST /api/v1/audits` audits `https://www.youtube.com`.
+- PASS: Repeated safe audit can return a cache hit.
+- PASS: Structured request IDs are returned.
+- PASS: Rate-limit headers appear on audit attempts.
+- PASS: Nested audit detail rendering works after the production UI validator hotfix.
+- PASS: Nullable page metadata rendering works after the production UI validator hotfix.
+- PASS: Private target `http://127.0.0.1` returns HTTP `400` with `BLOCKED_TARGET`.
+- PASS: Structured error rendering works.
+- PASS: Render-managed `PORT` observed as `10000`.
+- PASS: Render-managed HTTPS verified.
+- PASS: Footer shows `Built for Digital Heroes Training Task`.
+- PASS: `/favicon.ico` 404 is fixed in Phase 12 by serving the local SVG favicon.
 
 ## Security And Reliability Checks
 
-- Confirm response headers include `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and framing protection.
-- Decide whether `Strict-Transport-Security` (HSTS) should be enabled after Render HTTPS behaviour is verified. Do not use preload without a separate production decision.
-- Confirm no public response exposes secrets, stack traces, local paths, provider tokens, or card information.
-- Confirm structured logs include request IDs and do not include request bodies or response bodies.
-- Confirm restart clears only process-local state and the service becomes healthy again.
+- PASS: First-party responses include CSP, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and frame protection.
+- PASS: HSTS is enabled only in production as `Strict-Transport-Security: max-age=2592000`.
+- PASS: No public response is expected to expose secrets, stack traces, local paths, provider tokens, or card information.
+- PASS: Structured logs include request IDs and do not log request bodies or response bodies.
+- PASS: Restart clears only process-local cache, limiter, semaphore, and queue state.
+
+## TRUST_PROXY
+
+Status: unresolved by design.
+
+`TRUST_PROXY` remains unset. Current rate limiting uses the direct Render proxy-facing address behaviour. Proxy-aware per-end-user client identity requires separately verified deployment topology and spoofing checks. No public diagnostics endpoint or permanent forwarding-header logging has been added.
 
 ## Performance Checks
 
-- Run production Lighthouse against the generated HTTPS URL.
-- Record mobile run count, median results, Lighthouse version, Chrome version, and measurement conditions.
-- Treat results as lab data unless field-data tooling is added later.
+- Local Lighthouse lab measurements are documented in [../performance/lighthouse-report.md](../performance/lighthouse-report.md).
+- Production field performance is not measured.
+- Render Free cold-start delay remains a known limitation.
+
+## Deployment History
+
+- Phase 11B: Render deployment readiness migration completed.
+- Production hotfix: frontend success-response validator updated to accept nested security-header details and nullable page metadata.
+- Phase 12: final documentation polish, production-only HSTS, and favicon support.
 
 ## Rollback Confirmation
 
-After any rollback, repeat the root UI, static asset, health, audit, blocked target, request ID, log, and secret-leakage checks.
+After any rollback, repeat root UI, static asset, favicon, health, audit, blocked target, request ID, rate-limit, log, HSTS, and secret-leakage checks.

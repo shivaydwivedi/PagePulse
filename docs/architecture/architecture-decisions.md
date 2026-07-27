@@ -155,17 +155,26 @@ Back to the [architecture index](README.md).
 - Decision: Keep the public UI dependency-free and document repeated Lighthouse lab measurements.
 - Context: The public interface needs to be fast, reviewable, and honest about what has been measured.
 - Choice: Use system fonts, local static assets, initial-content HTML, no external runtime assets, and median results from repeated local Lighthouse runs.
-- Reason: Median lab results are more useful than a single best run, while avoiding field-data or production claims before deployment exists.
+- Reason: Median lab results are more useful than a single best run, while avoiding field-data claims that are not measured by the application.
 - Consequences: Local results must be remeasured after hosting, TLS, CDN, and production caching decisions exist.
 - Future reconsideration trigger: Deployment or product requirements introduce a build pipeline, CDN policy, or real-user monitoring.
 
 ## ADR-018 Render Single-Service Deployment
 
-- Decision: Prepare PagePulse for one Render Free Web Service.
+- Decision: Deploy PagePulse as one Render Free Web Service.
 - Context: The qualification project needs a simple production-like deployment path without adding infrastructure that the current product does not use.
 - Choice: Render Node runtime from repository root, build command `npm ci`, start command `npm start`, one Web Service instance, Render-managed HTTPS, Render-supplied `PORT`, and same-origin UI/API.
 - Reason: The existing Express app already serves both UI and API, has `GET /healthz`, uses process-local state intentionally, and does not need a database, volume, worker, or external runtime assets.
 - Consequences: Cache, queue, semaphore, and rate-limit buckets reset on restart and are not shared across instances. Render Free services may spin down after inactivity, causing a delayed first request after cold start.
-- Live verification requirement: `TRUST_PROXY` must remain pending until Render forwarding behaviour is observed in the deployed service.
+- Live verification outcome: `TRUST_PROXY` remains unset because a specific safe proxy hop count has not been proven. Current rate limiting uses the direct Render proxy-facing address behaviour.
 - Rollback policy: Prefer Render rollback or redeploy to a known good deployment where available, or a reviewed Git revert on `main`, followed by the post-deployment verification checklist.
 - Future reconsideration trigger: Requirements need multiple instances, persisted reports, authenticated quotas, shared rate limiting, or managed deployment automation.
+
+## ADR-019 Production-Only HSTS
+
+- Decision: Send `Strict-Transport-Security: max-age=2592000` only when `NODE_ENV=production`.
+- Context: Render-managed HTTPS has been verified for the live demo.
+- Choice: Use a conservative 30-day max age with no `includeSubDomains` and no `preload`.
+- Reason: Improves browser transport posture for the public demo while avoiding local-development breakage and broader domain commitments.
+- Consequences: Non-production responses intentionally omit HSTS.
+- Future reconsideration trigger: A custom domain, subdomain policy, preload readiness, or broader HTTPS ownership is established.

@@ -79,6 +79,11 @@ export function createApp(options = {}) {
     res.set('Cache-Control', 'no-cache')
     res.sendFile(path.join(publicDirectory, 'index.html'))
   })
+  app.get('/favicon.ico', (_req, res) => {
+    res.type('image/svg+xml')
+    res.set('Cache-Control', 'no-cache')
+    res.sendFile(path.join(publicDirectory, 'favicon.svg'))
+  })
   app.use(express.static(publicDirectory, {
     index: false,
     fallthrough: true,

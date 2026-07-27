@@ -18,7 +18,9 @@ const permissionsPolicy = [
   'usb=()'
 ].join(', ')
 
-export function securityHeadersMiddleware(_req, res, next) {
+const productionStrictTransportSecurity = 'max-age=2592000'
+
+export function securityHeadersMiddleware(req, res, next) {
   res.set({
     'Content-Security-Policy': contentSecurityPolicy,
     'X-Content-Type-Options': 'nosniff',
@@ -26,6 +28,10 @@ export function securityHeadersMiddleware(_req, res, next) {
     'Permissions-Policy': permissionsPolicy,
     'X-Frame-Options': 'DENY'
   })
+
+  if (req.app?.locals?.config?.NODE_ENV === 'production') {
+    res.set('Strict-Transport-Security', productionStrictTransportSecurity)
+  }
 
   next()
 }

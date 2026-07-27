@@ -26,7 +26,7 @@ The UI is LCP-conscious by construction: main heading and form are in initial HT
 
 Phase 10B measured the initial public UI with Lighthouse mobile navigation on a local `npm start` server. The median of three local runs recorded Performance 100, Accessibility 100, Best Practices 96, SEO 100, LCP 1.160 seconds, and CLS 0. Full conditions and limitations are documented in [docs/performance/lighthouse-report.md](../performance/lighthouse-report.md).
 
-These are lab measurements only. They are not production field data and should be repeated after deployment.
+These are lab measurements only. They are not production field data.
 
 ## Accessibility Approach
 
@@ -34,9 +34,7 @@ The page includes semantic landmarks, a skip link, visible labels, keyboard-acce
 
 ## Known Limitations
 
-- No deployed frontend exists yet.
-- No screenshots are committed.
-- Production Lighthouse, accessibility, and mobile performance measurement are pending until deployment exists.
+- Production field performance measurement is not implemented.
 - The UI intentionally does not render target pages or measure Core Web Vitals.
 
 ## UI Flow
