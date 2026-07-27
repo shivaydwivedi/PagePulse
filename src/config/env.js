@@ -4,6 +4,22 @@ const logLevels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal']
 const bodyLimitPattern = /^[1-9]\d*(b|kb|mb)$/i
 const userAgentPattern = /^[^\r\n]{1,120}$/
 
+const booleanSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value
+  }
+
+  if (value === 'true' || value === '1') {
+    return true
+  }
+
+  if (value === 'false' || value === '0') {
+    return false
+  }
+
+  return value
+}, z.boolean())
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -15,7 +31,13 @@ const envSchema = z.object({
   AUDIT_USER_AGENT: z.string()
     .regex(userAgentPattern, 'Expected a safe user agent string')
     .refine((value) => value.trim().length > 0, 'Expected a non-empty user agent string')
-    .default('PagePulseBot/1.0')
+    .default('PagePulseBot/1.0'),
+  AUDIT_CACHE_ENABLED: booleanSchema.default(true),
+  AUDIT_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(3600000).default(300000),
+  AUDIT_CACHE_MAX_ENTRIES: z.coerce.number().int().min(1).max(5000).default(500),
+  AUDIT_MAX_CONCURRENT: z.coerce.number().int().min(1).max(50).default(5),
+  AUDIT_MAX_QUEUE_SIZE: z.coerce.number().int().min(0).max(500).default(50),
+  AUDIT_QUEUE_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(2000)
 })
 
 export function parseEnv(source = process.env) {

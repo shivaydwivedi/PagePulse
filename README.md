@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 6 adds deterministic scoring, weighting, and grading on top of the safe outbound HTTP transport and HTML analysis layers. The API now validates and normalises audit URLs, performs destination-safety checks, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, and issues, and calculates a transparent project-specific PagePulse score.
+Phase 7 adds bounded in-memory TTL caching and per-process audit concurrency control on top of deterministic scoring, safe outbound HTTP transport, and HTML analysis. The API now validates and normalises audit URLs, checks the cache, bounds concurrent cache-miss audits, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, issues, and calculates a transparent project-specific PagePulse score.
 
-Caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
+Per-client rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
 
 ## Technology Stack
 
@@ -66,6 +66,12 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 | `AUDIT_MAX_REDIRECTS` | `5` | Integer from `0` to `10` | Maximum manual redirects to follow |
 | `AUDIT_MAX_RESPONSE_BYTES` | `1048576` | Integer from `1024` to `5242880` | Maximum upstream response body bytes |
 | `AUDIT_USER_AGENT` | `PagePulseBot/1.0` | 1-120 chars after requiring at least one non-whitespace character, no CR/LF | Outbound audit User-Agent |
+| `AUDIT_CACHE_ENABLED` | `true` | `true`, `false`, `1`, `0` | Enables the per-process in-memory audit cache |
+| `AUDIT_CACHE_TTL_MS` | `300000` | Integer from `1000` to `3600000` | Cache entry lifetime in milliseconds |
+| `AUDIT_CACHE_MAX_ENTRIES` | `500` | Integer from `1` to `5000` | Maximum cached audit payload count |
+| `AUDIT_MAX_CONCURRENT` | `5` | Integer from `1` to `50` | Maximum active cache-miss audits |
+| `AUDIT_MAX_QUEUE_SIZE` | `50` | Integer from `0` to `500` | Maximum FIFO queue depth for waiting audits |
+| `AUDIT_QUEUE_TIMEOUT_MS` | `2000` | Integer from `100` to `30000` | Maximum time a request may wait for an audit permit |
 
 ## Available Scripts
 
@@ -97,7 +103,7 @@ Every response includes an `X-Request-ID` header.
 
 ### `POST /api/v1/audits`
 
-Validates, normalises, safety-checks, fetches an audit target URL, extracts deterministic HTML audit signals, and calculates a transparent PagePulse score. In Phase 6, this endpoint returns transport metadata, score, grade, scoring breakdown, page metadata, checks, and issues.
+Validates, normalises, checks the audit cache, safety-checks and fetches a cache miss, extracts deterministic HTML audit signals, and calculates a transparent PagePulse score. In Phase 7, this endpoint returns transport metadata, cache state, score, grade, scoring breakdown, page metadata, checks, and issues.
 
 Request body:
 
@@ -149,6 +155,7 @@ Successful analysis response:
     "responseSizeBytes": 1256,
     "auditedAt": "2026-07-27T00:00:00.000Z",
     "auditStatus": "complete",
+    "cached": false,
     "score": 86,
     "grade": "B",
     "scoring": {
@@ -373,8 +380,114 @@ Current public error codes:
 | `UPSTREAM_UNSUPPORTED_CONTENT` | 422 | Destination did not return supported HTML content |
 | `UPSTREAM_REQUEST_FAILED` | 502 | Controlled fallback for other upstream transport failures |
 | `HTML_ANALYSIS_FAILED` | 422 | Upstream HTML could not be parsed for analysis |
+| `AUDIT_CAPACITY_EXCEEDED` | 503 | Active audit capacity is full, the FIFO queue is full, or a queued audit waited too long for a permit |
 | `NOT_FOUND` | 404 | Route was not found |
 | `INTERNAL_ERROR` | 500 | Unexpected application error |
+
+## Cache And Concurrency
+
+Phase 7 uses a custom per-process in-memory TTL cache and a custom per-process asynchronous semaphore. This is appropriate for the current single-instance API shape. The cache is cleared on restart, horizontally scaled instances do not share entries, and distributed deployment would require shared cache or coordinated capacity infrastructure.
+
+```mermaid
+flowchart TD
+    Request["Audit request"] --> Normalize["Validate and normalise URL"]
+    Normalize --> CacheLookup["Cache lookup by normalised URL"]
+    CacheLookup -->|HIT| HitResponse["Return cached payload with cached=true and X-Cache HIT"]
+    CacheLookup -->|MISS| Permit["Acquire audit permit"]
+    Permit -->|Unavailable| Capacity["AUDIT_CAPACITY_EXCEEDED"]
+    Permit -->|Acquired| SecondLookup["Second cache lookup"]
+    SecondLookup -->|HIT| ReleaseHit["Release permit and return HIT"]
+    SecondLookup -->|MISS| Execute["Transport, analyse, score"]
+    Execute --> Store["Store successful public payload"]
+    Store --> ReleaseMiss["Release permit and return MISS"]
+```
+
+Cache key rules:
+
+- The key is the fully normalised requested audit URL.
+- Hostname case, default ports, and fragments follow the URL normalisation rules above.
+- Path and query string remain significant, so `/a`, `/b`, `?a=1`, and `?a=2` are distinct.
+- Request ID, client IP, response headers, score alone, and raw request bodies are not cache keys.
+
+Cache value rules:
+
+- The cache stores only the completed public audit payload: transport metadata, `auditStatus`, score, grade, scoring breakdown, page, checks, and issues.
+- The cache does not store request IDs, success envelopes, `cached`, `X-Cache`, raw HTML, raw upstream headers, approved IP addresses, dispatchers, streams, abort controllers, errors, loggers, or Express objects.
+- Values are cloned on write and read with `structuredClone`, so mutating a returned response cannot mutate the stored entry.
+- Cached values are validated before use. Malformed or stale injected cache entries are treated as misses, may be discarded, and do not produce a public cache error; PagePulse proceeds with a fresh audit when possible.
+
+TTL and eviction:
+
+- TTL starts when a successful audit payload is stored.
+- Entries are valid before expiry and expired at or after the expiry timestamp.
+- Cache hits do not extend TTL.
+- Replacing an entry resets TTL.
+- Expired entries are removed lazily; no background cleanup interval is created.
+- Capacity is bounded by `AUDIT_CACHE_MAX_ENTRIES`.
+- Eviction is deterministic LRU: valid hits and sets move an entry to most-recent position; when full, the least-recently-used entry is removed.
+- Disabled cache always misses, stores nothing, and remains size zero.
+
+Successful audit response cache state:
+
+| Scenario | `cached` | Header |
+| --- | --- | --- |
+| Fresh audit | `false` | `X-Cache: MISS` |
+| Cache hit | `true` | `X-Cache: HIT` |
+
+Every request receives a fresh `requestId`, including cache hits. Cache hits preserve the original cached payload values such as `auditedAt`, `responseTimeMs`, `finalUrl`, score, checks, and issues; they do not pretend a new audit ran. Error responses omit `X-Cache`.
+
+Repeated-request example:
+
+```text
+POST /api/v1/audits {"url":"https://EXAMPLE.com:443/#section"}
+-> normalised key https://example.com/
+-> X-Cache: MISS, cached: false, requestId: A
+
+POST /api/v1/audits {"url":"https://example.com/"}
+-> same normalised key
+-> X-Cache: HIT, cached: true, requestId: B
+-> auditedAt and responseTimeMs remain from the original audit
+```
+
+Caching eligibility:
+
+- Successful completed HTML audits are cached after transport, analysis, and scoring complete.
+- Validation errors, blocked targets, DNS failures, timeouts, connection failures, TLS failures, redirect failures, oversized responses, unsupported content, analyser errors, scorer errors, capacity errors, and internal errors are not cached.
+- Completed upstream `404` or `500` HTML audits may be cached because PagePulse completed transport, analysis, and scoring; the upstream status remains visible as `httpStatus` and an issue.
+- Unexpected cache read errors fail open as misses; unexpected cache write errors fail open and still return the fresh successful audit.
+
+Concurrency control:
+
+- Cache hits bypass the semaphore and do not consume audit permits.
+- Cache misses acquire a permit before destination safety, DNS, transport, analysis, and scoring.
+- At most `AUDIT_MAX_CONCURRENT` cache-miss audits hold permits at once.
+- Additional cache misses wait in a per-process FIFO queue up to `AUDIT_MAX_QUEUE_SIZE`.
+- Queue size `0` disables waiting; requests beyond active capacity fail immediately.
+- Waiting requests fail with `AUDIT_CAPACITY_EXCEEDED` if they exceed `AUDIT_QUEUE_TIMEOUT_MS`.
+- Queue timeout is separate from `AUDIT_TIMEOUT_MS`: a request may wait up to `AUDIT_QUEUE_TIMEOUT_MS`, then run transport under `AUDIT_TIMEOUT_MS`.
+- Permit release runs in a `finally` path after success, transport failure, analysis failure, scorer failure, or cache-write failure.
+- After a queued request acquires a permit, PagePulse checks the cache again before transport. If another request already populated the cache for the same normalised URL, the permit is released and the request returns `X-Cache: HIT`.
+- Semaphore state is internal to the application instance and is not exposed through public API responses or capacity errors.
+
+Capacity error response:
+
+```json
+{
+  "success": false,
+  "requestId": "current-request-id",
+  "error": {
+    "code": "AUDIT_CAPACITY_EXCEEDED",
+    "message": "PagePulse is currently processing the maximum number of audits.",
+    "details": [
+      {
+        "reason": "queue_full"
+      }
+    ]
+  }
+}
+```
+
+Stable capacity reasons are `capacity_reached`, `queue_full`, and `queue_timeout`. They do not expose active URLs, queued URLs, thread counts, other clients, internal promise state, or stack traces.
 
 ## HTML Analysis
 
@@ -497,7 +610,7 @@ Issue-code catalogue:
 | `MISSING_REFERRER_POLICY` | warning | security |
 | `MISSING_PERMISSIONS_POLICY` | warning | security |
 
-Phase 5 extraction rules remain unchanged in Phase 6. No separate recommendation list is returned; issue suggestions remain inside the `issues` array.
+Phase 5 extraction rules remain unchanged in Phase 7. No separate recommendation list is returned; issue suggestions remain inside the `issues` array.
 
 ## Scoring
 
@@ -707,7 +820,7 @@ Example DNS failure response:
 
 Current security limitations:
 
-- PagePulse now performs outbound HTTP transport, deterministic HTML analysis, and project-specific scoring.
+- PagePulse now performs outbound HTTP transport, deterministic HTML analysis, project-specific scoring, bounded per-process caching, and bounded per-process audit concurrency control.
 - DNS rebinding risk is reduced by per-step approved-address dispatching, but not eliminated by application-level checks alone.
 - Real certificate and SNI behaviour relies on Undici's TLS stack and preserving the original hostname as `servername`; full production certificate-path validation may still require deployment-level validation against the eventual hosting environment.
 - Deployment proxies, custom infrastructure, or future distributed architecture may require network-level egress rules.
