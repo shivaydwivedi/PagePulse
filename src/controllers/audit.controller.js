@@ -1,8 +1,10 @@
 import { prepareAuditRequest } from '../services/audit.service.js'
 import { errorEnvelope } from '../utils/response-envelope.js'
 
-export function createAuditController(req, res) {
-  const { normalisedUrl } = prepareAuditRequest(req.body)
+export async function createAuditController(req, res) {
+  const { normalisedUrl } = await prepareAuditRequest(req.body, {
+    destinationSafetyService: req.app.locals.destinationSafetyService
+  })
 
   res.status(501).json(errorEnvelope({
     requestId: req.id,
