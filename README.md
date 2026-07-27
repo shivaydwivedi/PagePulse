@@ -4,7 +4,7 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources. Phase 10 adds a lightweight public demo UI served by the existing Express application. Phase 11A prepares Northflank deployment documentation and readiness checks.
+Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources. Phase 10 adds a lightweight public demo UI served by the existing Express application. Phase 11B prepares Render deployment documentation and readiness checks.
 
 The CI workflow is configured and will run on pushes and pull requests after this branch is merged. The public demonstration UI is implemented; deployment is prepared but not live.
 
@@ -80,12 +80,13 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 
 ## Deployment Status
 
-- Provider selected: Northflank.
+- Provider selected: Render.
 - Status: Prepared, not live.
-- Live URL: pending Northflank deployment.
-- Architecture: one Buildpack service serving same-origin UI and API on runtime `PORT=8080`.
-- Storage: no database, volume, or persistent storage.
-- Production verification: pending generated HTTPS URL, health checks, proxy/IP behaviour, logs, and Lighthouse rerun.
+- Live URL: pending Render deployment.
+- Architecture: one Render Web Service serving same-origin UI and API. Render supplies `PORT` automatically, so no fixed port is hardcoded.
+- Free tier: cold starts after inactivity are possible.
+- Storage: no database, persistent disk, Redis, Cloudinary, or persistent storage.
+- Production verification: pending generated HTTPS URL, health check, proxy/IP behaviour, `TRUST_PROXY` decision, logs, and Lighthouse rerun.
 
 Deployment readiness documentation lives in [docs/deployment/README.md](docs/deployment/README.md). The prepared architecture is documented in [docs/architecture/future-deployment-architecture.md](docs/architecture/future-deployment-architecture.md).
 
@@ -145,7 +146,7 @@ Key documents:
 - [CI and quality gates](docs/architecture/ci-and-quality-gates.md)
 - [Architecture decisions](docs/architecture/architecture-decisions.md)
 
-Frontend architecture is implemented for the current plain HTML, CSS and JavaScript UI. Deployment architecture is prepared for Northflank but is not live.
+Frontend architecture is implemented for the current plain HTML, CSS and JavaScript UI. Deployment architecture is prepared for Render but is not live.
 
 ## Project Structure
 

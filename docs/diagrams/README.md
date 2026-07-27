@@ -13,6 +13,6 @@ These Mermaid files are the canonical diagram sources for PagePulse architecture
 | [rate-limit-flow.mmd](rate-limit-flow.mmd) | Shows audit rate-limit decisions | [Rate limiting](../architecture/rate-limiting.md) | Implemented | Update when quota accounting or client identity changes |
 | [error-handling-flow.mmd](error-handling-flow.mmd) | Shows error mapping and response safety | [Observability and errors](../architecture/observability-and-errors.md) | Implemented | Update when public error contracts change |
 | [ci-quality-flow.mmd](ci-quality-flow.mmd) | Shows CI quality gates | [CI and quality gates](../architecture/ci-and-quality-gates.md) | Implemented | Update when workflow steps change |
-| [deployment-flow.mmd](deployment-flow.mmd) | Shows the prepared Northflank single-service deployment path | [Future deployment architecture](../architecture/future-deployment-architecture.md) | Prepared | Update after live deployment verification |
+| [deployment-flow.mmd](deployment-flow.mmd) | Shows the prepared Render single-service deployment path | [Future deployment architecture](../architecture/future-deployment-architecture.md) | Prepared | Update after live deployment verification |
 
 Back to the [architecture index](../architecture/README.md).

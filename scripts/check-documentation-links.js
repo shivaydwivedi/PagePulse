@@ -36,7 +36,7 @@ export const requiredPerformanceFiles = [
 
 export const requiredDeploymentFiles = [
   'docs/deployment/README.md',
-  'docs/deployment/northflank-configuration.md',
+  'docs/deployment/render-configuration.md',
   'docs/deployment/production-environment.md',
   'docs/deployment/operations-and-rollback.md',
   'docs/deployment/post-deployment-verification.md'
@@ -164,22 +164,33 @@ export function validateDocumentationStructure() {
   }
 
   const deploymentReadme = existsSync('docs/deployment/README.md') ? readText('docs/deployment/README.md') : ''
-  const northflankConfig = existsSync('docs/deployment/northflank-configuration.md') ? readText('docs/deployment/northflank-configuration.md') : ''
+  const renderConfig = existsSync('docs/deployment/render-configuration.md') ? readText('docs/deployment/render-configuration.md') : ''
   const productionEnv = existsSync('docs/deployment/production-environment.md') ? readText('docs/deployment/production-environment.md') : ''
   const rollback = existsSync('docs/deployment/operations-and-rollback.md') ? readText('docs/deployment/operations-and-rollback.md') : ''
   const verification = existsSync('docs/deployment/post-deployment-verification.md') ? readText('docs/deployment/post-deployment-verification.md') : ''
-  const deploymentCombined = [deploymentReadme, northflankConfig, productionEnv, rollback, verification].join('\n')
+  const deploymentCombined = [deploymentReadme, renderConfig, productionEnv, rollback, verification].join('\n')
+
+  if (existsSync('docs/deployment/northflank-configuration.md')) {
+    errors.push('Obsolete Northflank deployment configuration must not remain active.')
+  }
 
   for (const requiredText of [
     'Status: Prepared',
     'not live',
+    'Provider: Render',
+    'Live URL: pending',
     'Requires live verification',
     'rollback',
     'post-deployment',
-    'Buildpack',
-    'Instances',
+    'Web Service',
+    'Build command',
+    'npm ci',
+    'Start command',
+    'npm start',
+    'Render supplies `PORT` automatically',
+    'cold start',
     'No database',
-    'No volume'
+    'No persistent disk'
   ]) {
     if (!deploymentCombined.includes(requiredText)) {
       errors.push(`Deployment documentation is missing required text: ${requiredText}`)
@@ -190,28 +201,32 @@ export function validateDocumentationStructure() {
     errors.push('Deployment documentation must mark TRUST_PROXY as pending live verification.')
   }
 
-  if (!verification.includes('generated HTTPS URL')) {
-    errors.push('Post-deployment checklist must include generated HTTPS URL verification.')
+  if (!verification.includes('generated onrender.com HTTPS URL')) {
+    errors.push('Post-deployment checklist must include generated onrender.com HTTPS URL verification.')
   }
 
   if (!verification.includes('Rate-limit headers')) {
     errors.push('Post-deployment checklist must include rate-limit header verification.')
   }
 
-  if (!rollback.includes('Git revert rollback') || !rollback.includes('Northflank rollback')) {
-    errors.push('Rollback documentation must include Northflank and Git revert paths.')
+  if (!rollback.includes('Git revert rollback') || !rollback.includes('Render rollback')) {
+    errors.push('Rollback documentation must include Render and Git revert paths.')
   }
 
   if (/card (number|data)|credit card number|payment card number/i.test(deploymentCombined)) {
     errors.push('Deployment documentation must not include payment card data.')
   }
 
-  if (/https:\/\/(pagepulse|[^ \n)]+northflank)[^ \n)]*/i.test(deploymentCombined)) {
+  if (/https:\/\/(pagepulse|[^ \n)]+(?:northflank|onrender\.com))[^ \n)]*/i.test(deploymentCombined)) {
     errors.push('Deployment documentation must not present a live deployment URL.')
   }
 
   if (/(secret|token|password)\s*[:=]\s*\S+/i.test(deploymentCombined)) {
     errors.push('Deployment documentation must not include provider secrets.')
+  }
+
+  if (/Northflank|northflank/i.test(deploymentCombined)) {
+    errors.push('Deployment documentation must not keep Northflank as the active provider.')
   }
 
   return errors
