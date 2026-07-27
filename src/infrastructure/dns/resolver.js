@@ -1,13 +1,43 @@
 import dns from 'node:dns/promises'
 import { AppError } from '../../utils/errors.js'
 
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw signal.reason ?? new DOMException('The operation was aborted.', 'AbortError')
+  }
+}
+
+function raceWithAbort(promise, signal) {
+  if (!signal) {
+    return promise
+  }
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'))
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', onAbort)
+    })
+  })
+}
+
 export function createDnsResolver(lookup = dns.lookup) {
-  return async function resolveHostname(hostname) {
+  return async function resolveHostname(hostname, options = {}) {
+    const { signal } = options
+
     try {
-      const addresses = await lookup(hostname, {
+      throwIfAborted(signal)
+
+      const lookupPromise = lookup(hostname, {
         all: true,
         verbatim: true
       })
+      const addresses = await raceWithAbort(lookupPromise, signal)
+
+      throwIfAborted(signal)
 
       return addresses.map((result) => ({
         address: result.address,

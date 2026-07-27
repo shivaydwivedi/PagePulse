@@ -119,6 +119,37 @@ describe('destination safety service', () => {
       .validateDestination('https://xn--bcher-kva.example/')).resolves.toMatchObject({
       hostname: 'xn--bcher-kva.example'
     })
-    expect(resolver).toHaveBeenCalledWith('xn--bcher-kva.example')
+    expect(resolver).toHaveBeenCalledWith('xn--bcher-kva.example', { signal: undefined })
+  })
+
+  it('passes abort signals into DNS resolution', async () => {
+    const controller = new AbortController()
+    const resolver = vi.fn(async () => [{ address: '93.184.216.34', family: 4 }])
+    const service = createDestinationSafetyService({ resolver })
+
+    await expect(service.validateDestination('https://example.com/', {
+      signal: controller.signal
+    })).resolves.toMatchObject({
+      hostname: 'example.com'
+    })
+    expect(resolver).toHaveBeenCalledWith('example.com', { signal: controller.signal })
+  })
+
+  it('rejects aborted validation before DNS resolution starts', async () => {
+    const controller = new AbortController()
+    const resolver = vi.fn(async (_hostname, { signal }) => {
+      expect(signal).toBe(controller.signal)
+      throw signal.reason
+    })
+    const service = createDestinationSafetyService({ resolver })
+
+    controller.abort(new DOMException('overall timeout', 'AbortError'))
+
+    await expect(service.validateDestination('https://example.com/', {
+      signal: controller.signal
+    })).rejects.toMatchObject({
+      name: 'AbortError'
+    })
+    expect(resolver).not.toHaveBeenCalled()
   })
 })

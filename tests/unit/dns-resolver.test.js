@@ -49,4 +49,24 @@ describe('DNS resolver wrapper', () => {
       expect(JSON.stringify(error.details)).not.toContain('EAI_AGAIN')
     }
   })
+
+  it('rejects promptly on abort while the underlying lookup is still pending', async () => {
+    let resolveLookup
+    const lookup = vi.fn(() => new Promise((resolve) => {
+      resolveLookup = resolve
+    }))
+    const resolveHostname = createDnsResolver(lookup)
+    const controller = new AbortController()
+    const result = resolveHostname('example.com', { signal: controller.signal })
+
+    controller.abort(new DOMException('overall timeout', 'AbortError'))
+
+    await expect(result).rejects.toMatchObject({
+      code: 'DNS_LOOKUP_FAILED',
+      statusCode: 502,
+      cause: expect.objectContaining({ name: 'AbortError' })
+    })
+
+    resolveLookup([{ address: '93.184.216.34', family: 4 }])
+  })
 })
