@@ -1,6 +1,6 @@
 # PagePulse Architecture
 
-This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, and where deployment decisions remain open.
+This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, where local performance measurements live, and where deployment decisions remain open.
 
 Back to the [root README](../../README.md).
 
@@ -8,7 +8,7 @@ Back to the [root README](../../README.md).
 
 Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured locally. Phase 9B adds this architecture documentation system. Phase 10 adds the public demo UI served by the existing Express application.
 
-Deployment architecture is planned only. These documents do not claim a deployed service or measured Lighthouse result.
+Deployment architecture is planned only. Local Lighthouse lab measurements are recorded separately and do not claim production field data.
 
 ## Navigation
 
@@ -26,6 +26,10 @@ Deployment architecture is planned only. These documents do not claim a deployed
 | [Architecture decisions](architecture-decisions.md) | ADR-style index of current design choices | Implemented | None |
 | [Future frontend architecture](future-frontend-architecture.md) | Public UI architecture and remaining measurement limits | Implemented | [system-context.mmd](../diagrams/system-context.mmd) |
 | [Future deployment architecture](future-deployment-architecture.md) | Planned deployment concerns and undecided hosting choices | Planned | None |
+
+Performance documentation:
+
+- [Lighthouse performance report](../performance/lighthouse-report.md)
 
 ## Diagram Catalogue
 

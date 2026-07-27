@@ -29,6 +29,17 @@ export const requiredDiagramFiles = [
   'docs/diagrams/ci-quality-flow.mmd'
 ]
 
+export const requiredPerformanceFiles = [
+  'docs/performance/lighthouse-report.md'
+]
+
+export const requiredScreenshotFiles = [
+  'docs/screenshots/pagepulse-light-desktop.png',
+  'docs/screenshots/pagepulse-dark-results.png',
+  'docs/screenshots/pagepulse-light-mobile.png',
+  'docs/screenshots/pagepulse-dark-error.png'
+]
+
 const mermaidKeywords = ['flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram', 'erDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'timeline']
 const windowsPathPattern = /[A-Za-z]:\\(?:Users|[^ \n\r\t]*)/
 const localFileLinkPattern = /\]\(\/[A-Za-z]:\//
@@ -47,7 +58,7 @@ function hasUnsafeLocalPath(text) {
 
 export function validateDocumentationStructure() {
   const errors = []
-  const requiredFiles = [...requiredArchitectureFiles, ...requiredDiagramFiles]
+  const requiredFiles = [...requiredArchitectureFiles, ...requiredDiagramFiles, ...requiredPerformanceFiles]
 
   for (const file of requiredFiles) {
     if (!existsSync(file)) {
@@ -109,6 +120,29 @@ export function validateDocumentationStructure() {
 
   if (existsSync('README.md') && !readText('README.md').includes('docs/architecture/README.md')) {
     errors.push('Root README does not link the architecture index.')
+  }
+
+  const rootReadme = existsSync('README.md') ? readText('README.md') : ''
+  for (const file of requiredScreenshotFiles) {
+    if (!existsSync(file)) {
+      errors.push(`Missing required screenshot file: ${file}`)
+      continue
+    }
+
+    if (!rootReadme.includes(file)) {
+      errors.push(`Root README does not reference screenshot with a repository-relative path: ${file}`)
+    }
+  }
+
+  const performanceReport = existsSync('docs/performance/lighthouse-report.md') ? readText('docs/performance/lighthouse-report.md') : ''
+  for (const requiredText of ['Measurement Conditions', 'Median', 'lab results', 'not field data', 'LCP', 'CLS']) {
+    if (!performanceReport.includes(requiredText)) {
+      errors.push(`Performance report is missing required text: ${requiredText}`)
+    }
+  }
+
+  if (performanceReport.includes('production field data') && !performanceReport.includes('not production field data')) {
+    errors.push('Performance report must not claim production field data.')
   }
 
   return errors

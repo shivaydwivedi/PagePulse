@@ -105,6 +105,20 @@ The page is LCP-conscious by construction: the main heading and form are in init
 
 The footer visibly includes the required `Built for Digital Heroes Training Task` attribution linking to `https://digitalheroesco.com`.
 
+## Interface Screenshots
+
+![PagePulse light-mode audit form](docs/screenshots/pagepulse-light-desktop.png)
+
+![PagePulse dark-mode audit result](docs/screenshots/pagepulse-dark-results.png)
+
+![PagePulse light-mode mobile layout](docs/screenshots/pagepulse-light-mobile.png)
+
+![PagePulse dark-mode error state](docs/screenshots/pagepulse-dark-error.png)
+
+## Performance Measurement
+
+Local Lighthouse mobile measurements for the initial public UI are recorded in [docs/performance/lighthouse-report.md](docs/performance/lighthouse-report.md). The median of three local runs measured Performance 100, Accessibility 100, Best Practices 96, SEO 100, LCP 1.160 seconds, and CLS 0. These are lab measurements only, not production field data.
+
 ## Architecture Documentation
 
 Detailed architecture notes live in [docs/architecture/README.md](docs/architecture/README.md), with reusable Mermaid sources in [docs/diagrams/README.md](docs/diagrams/README.md).

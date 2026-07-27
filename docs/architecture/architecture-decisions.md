@@ -149,3 +149,12 @@ Back to the [architecture index](README.md).
 - Reason: Keeps the page small, LCP-conscious, easy to review, and free of framework or build dependencies.
 - Consequences: UI state and rendering helpers are maintained manually.
 - Future reconsideration trigger: The frontend grows into a multi-page application or needs a build pipeline.
+
+## ADR-017 Performance-First Static UI And Lab Measurement Policy
+
+- Decision: Keep the public UI dependency-free and document repeated Lighthouse lab measurements.
+- Context: The public interface needs to be fast, reviewable, and honest about what has been measured.
+- Choice: Use system fonts, local static assets, initial-content HTML, no external runtime assets, and median results from repeated local Lighthouse runs.
+- Reason: Median lab results are more useful than a single best run, while avoiding field-data or production claims before deployment exists.
+- Consequences: Local results must be remeasured after hosting, TLS, CDN, and production caching decisions exist.
+- Future reconsideration trigger: Deployment or product requirements introduce a build pipeline, CDN policy, or real-user monitoring.
