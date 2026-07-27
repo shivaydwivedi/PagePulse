@@ -17,7 +17,12 @@ describe('environment configuration', () => {
       AUDIT_CACHE_MAX_ENTRIES: 500,
       AUDIT_MAX_CONCURRENT: 5,
       AUDIT_MAX_QUEUE_SIZE: 50,
-      AUDIT_QUEUE_TIMEOUT_MS: 2000
+      AUDIT_QUEUE_TIMEOUT_MS: 2000,
+      AUDIT_RATE_LIMIT_ENABLED: true,
+      AUDIT_RATE_LIMIT_WINDOW_MS: 60000,
+      AUDIT_RATE_LIMIT_MAX_REQUESTS: 30,
+      AUDIT_RATE_LIMIT_MAX_CLIENTS: 10000,
+      TRUST_PROXY: false
     })
   })
 
@@ -94,5 +99,52 @@ describe('environment configuration', () => {
     expect(parseEnv({ AUDIT_QUEUE_TIMEOUT_MS: '100' }).AUDIT_QUEUE_TIMEOUT_MS).toBe(100)
     expect(parseEnv({ AUDIT_QUEUE_TIMEOUT_MS: '30000' }).AUDIT_QUEUE_TIMEOUT_MS).toBe(30000)
     expect(() => parseEnv({ AUDIT_QUEUE_TIMEOUT_MS: '30001' })).toThrow()
+  })
+
+  it('validates audit rate-limit configuration', () => {
+    expect(parseEnv({ AUDIT_RATE_LIMIT_ENABLED: 'true' }).AUDIT_RATE_LIMIT_ENABLED).toBe(true)
+    expect(parseEnv({ AUDIT_RATE_LIMIT_ENABLED: 'false' }).AUDIT_RATE_LIMIT_ENABLED).toBe(false)
+    expect(parseEnv({ AUDIT_RATE_LIMIT_ENABLED: '1' }).AUDIT_RATE_LIMIT_ENABLED).toBe(true)
+    expect(parseEnv({ AUDIT_RATE_LIMIT_ENABLED: '0' }).AUDIT_RATE_LIMIT_ENABLED).toBe(false)
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_ENABLED: 'yes' })).toThrow()
+
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_WINDOW_MS: '999' })).toThrow()
+    expect(parseEnv({ AUDIT_RATE_LIMIT_WINDOW_MS: '1000' }).AUDIT_RATE_LIMIT_WINDOW_MS).toBe(1000)
+    expect(parseEnv({ AUDIT_RATE_LIMIT_WINDOW_MS: '3600000' }).AUDIT_RATE_LIMIT_WINDOW_MS).toBe(3600000)
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_WINDOW_MS: '3600001' })).toThrow()
+
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_MAX_REQUESTS: '0' })).toThrow()
+    expect(parseEnv({ AUDIT_RATE_LIMIT_MAX_REQUESTS: '1' }).AUDIT_RATE_LIMIT_MAX_REQUESTS).toBe(1)
+    expect(parseEnv({ AUDIT_RATE_LIMIT_MAX_REQUESTS: '10000' }).AUDIT_RATE_LIMIT_MAX_REQUESTS).toBe(10000)
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_MAX_REQUESTS: '10001' })).toThrow()
+
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_MAX_CLIENTS: '0' })).toThrow()
+    expect(parseEnv({ AUDIT_RATE_LIMIT_MAX_CLIENTS: '1' }).AUDIT_RATE_LIMIT_MAX_CLIENTS).toBe(1)
+    expect(parseEnv({ AUDIT_RATE_LIMIT_MAX_CLIENTS: '100000' }).AUDIT_RATE_LIMIT_MAX_CLIENTS).toBe(100000)
+    expect(() => parseEnv({ AUDIT_RATE_LIMIT_MAX_CLIENTS: '100001' })).toThrow()
+  })
+
+  it('validates trust proxy configuration', () => {
+    expect(parseEnv({ TRUST_PROXY: false }).TRUST_PROXY).toBe(false)
+    expect(parseEnv({ TRUST_PROXY: true }).TRUST_PROXY).toBe(true)
+    expect(parseEnv({ TRUST_PROXY: 0 }).TRUST_PROXY).toBe(0)
+    expect(parseEnv({ TRUST_PROXY: 1 }).TRUST_PROXY).toBe(1)
+    expect(parseEnv({ TRUST_PROXY: 10 }).TRUST_PROXY).toBe(10)
+    expect(parseEnv({ TRUST_PROXY: 'false' }).TRUST_PROXY).toBe(false)
+    expect(parseEnv({ TRUST_PROXY: 'true' }).TRUST_PROXY).toBe(true)
+    expect(parseEnv({ TRUST_PROXY: '0' }).TRUST_PROXY).toBe(0)
+    expect(parseEnv({ TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1)
+    expect(parseEnv({ TRUST_PROXY: '10' }).TRUST_PROXY).toBe(10)
+    expect(() => parseEnv({ TRUST_PROXY: '' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: '   ' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: '-1' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: '11' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: '1.5' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: 'yes' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: 'no' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: 'subnet' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: '1,2' })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: [] })).toThrow()
+    expect(() => parseEnv({ TRUST_PROXY: {} })).toThrow()
   })
 })
