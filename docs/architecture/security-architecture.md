@@ -34,9 +34,9 @@ Environment secrets should be provided through `.env` locally or platform enviro
 
 CI runs high-severity `npm audit`, repository hygiene checks, committed whitespace checks, and dependency tree validation.
 
-First-party responses set `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and frame protection. The CSP permits same-origin CSS, module JavaScript, images, API calls, and the existing inline theme bootstrap. It does not require external runtime assets. `Strict-Transport-Security` is not set during local readiness because final HTTPS behaviour must be verified after Northflank deployment.
+First-party responses set `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and frame protection. The CSP permits same-origin CSS, module JavaScript, images, API calls, and the existing inline theme bootstrap. It does not require external runtime assets. `Strict-Transport-Security` is not set during local readiness because final HTTPS behaviour must be verified after Render deployment; after live verification, HSTS may be considered without preload.
 
-`TRUST_PROXY` status for Northflank: Requires live verification. The final setting must be based on deployed evidence for `req.socket.remoteAddress`, `req.ip`, `req.ips`, and Northflank forwarding headers. Do not add permanent raw forwarding-header logging or a public diagnostic endpoint.
+`TRUST_PROXY` status for Render: Requires live verification. The final setting must be based on deployed evidence for `req.socket.remoteAddress`, `req.ip`, `req.ips`, `X-Forwarded-For` handling, distinct client rate-limit buckets, and spoofed forwarding-input behaviour. Do not add permanent raw forwarding-header logging or a public diagnostic endpoint.
 
 ## Diagram
 

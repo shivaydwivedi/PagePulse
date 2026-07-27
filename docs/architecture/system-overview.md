@@ -47,8 +47,8 @@ The public UI owns browser-side presentation, same-origin API calls, theme prefe
 
 ## Process-Local State
 
-The TTL cache, semaphore, queue, and fixed-window rate limiter are process-local. They reset on process restart and are not shared across horizontally scaled instances. Phase 11A prepares a one-instance Northflank deployment, so distributed state is intentionally not introduced.
+The TTL cache, semaphore, queue, and fixed-window rate limiter are process-local. They reset on process restart and are not shared across horizontally scaled instances. Phase 11B prepares a one-instance Render deployment, so distributed state is intentionally not introduced.
 
 ## Current Limitations
 
-PagePulse is prepared for Northflank but is not live, does not use a database, and does not provide distributed cache or distributed rate limiting. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.
+PagePulse is prepared for Render but is not live, does not use a database, and does not provide distributed cache or distributed rate limiting. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.

@@ -1,9 +1,9 @@
 flowchart TD
-  GitHubMain["GitHub main branch"] --> Buildpack["Northflank Buildpack build"]
-  Buildpack --> Service["Northflank service: one instance"]
-  Service --> HTTPS["Public HTTPS endpoint"]
+  GitHubMain["GitHub main branch"] --> RenderBuild["Render build and deploy"]
+  RenderBuild --> Service["Render Web Service: one instance"]
+  Service --> HTTPS["Render-managed HTTPS"]
   HTTPS --> Express["Express same-origin UI and API"]
-  Probe["Northflank health probes"] --> Health["GET /healthz"]
+  Probe["Render health check"] --> Health["GET /healthz"]
   Health --> Express
   Express --> Logs["Structured logs"]
   Express --> Safety["Destination safety and HTTP client"]

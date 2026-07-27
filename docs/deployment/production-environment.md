@@ -2,12 +2,12 @@
 
 Status: Prepared, not live
 
-PagePulse reads environment variables through [src/config/env.js](../../src/config/env.js). `npm start` does not automatically load `.env`; Northflank should provide runtime variables through its dashboard.
+PagePulse reads environment variables through [src/config/env.js](../../src/config/env.js). `npm start` does not automatically load `.env`; Render should provide runtime variables through its dashboard.
 
-| Name | Purpose | Type | Default | Min | Max | Production recommendation | Required | Secret | Set on Northflank |
+| Name | Purpose | Type | Default | Min | Max | Production recommendation | Required | Secret | Set on Render |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `NODE_ENV` | Runtime mode | enum: `development`, `test`, `production` | `development` | n/a | n/a | `production` | No | No | Yes |
-| `PORT` | HTTP server port | integer | `3000` | `1` | `65535` | `8080` | No | No | Yes |
+| `PORT` | HTTP server port | integer | `3000` | `1` | `65535` | Render-managed; do not set manually unless proven necessary | No | No | No |
 | `LOG_LEVEL` | Structured logger level | enum: `trace`, `debug`, `info`, `warn`, `error`, `fatal` | `info` | n/a | n/a | `info` | No | No | Optional |
 | `REQUEST_BODY_LIMIT` | JSON request body limit | size string matching positive `b`, `kb`, or `mb` | `16kb` | positive bytes | positive MB value accepted by parser | keep `16kb` | No | No | No |
 | `AUDIT_TIMEOUT_MS` | Total outbound audit timeout across safety validation, DNS wait, redirects, request, and body streaming | integer milliseconds | `8000` | `500` | `30000` | keep `8000` until live platform timeout is verified | No | No | No |
@@ -39,3 +39,5 @@ Invalid values are rejected at process startup because `src/server.js` calls `pa
 Status: Requires live verification
 
 Accepted values are `false`, `true`, or integer hop counts from `0` through `10`. The default `false` makes Express use the socket address for `req.ip`, ignoring spoofable forwarding headers. Setting it too broadly can let a client influence rate-limit identity through forwarded headers. Leaving it disabled behind a proxy can collapse many users into the proxy address and make rate limiting less fair.
+
+After Render deployment, compare `req.socket.remoteAddress`, `req.ip`, `req.ips`, `X-Forwarded-For` handling, whether distinct clients receive distinct rate-limit buckets, and whether spoofed forwarding input can influence identity. Do not add a public diagnostics endpoint and do not permanently log full forwarding headers.

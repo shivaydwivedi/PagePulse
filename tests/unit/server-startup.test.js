@@ -6,7 +6,7 @@ function readServer() {
 }
 
 describe('server entrypoint deployment compatibility', () => {
-  it('starts the production server from parsed environment port without watch mode', () => {
+  it('starts the production server from parsed Render-managed environment port without watch mode', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
     const server = readServer()
 
@@ -17,6 +17,7 @@ describe('server entrypoint deployment compatibility', () => {
     expect(server).toContain('server.listen(env.PORT')
     expect(server).toContain('PagePulse server started')
     expect(server).not.toMatch(/server\.listen\(env\.PORT,\s*['"`]localhost/)
+    expect(server).not.toContain('8080')
     expect(packageJson.engines.node).toBe('>=22 <25')
   })
 
