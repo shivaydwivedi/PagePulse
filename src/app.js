@@ -9,6 +9,7 @@ import { healthRouter } from './routes/health.routes.js'
 import { createAuditHttpClient } from './infrastructure/http/audit-http-client.js'
 import { createTtlCache } from './infrastructure/cache/ttl-cache.js'
 import { createAuditSemaphore } from './infrastructure/concurrency/audit-semaphore.js'
+import { createFixedWindowRateLimiter } from './infrastructure/rate-limit/fixed-window-rate-limiter.js'
 import { createDestinationSafetyService } from './services/destination-safety.service.js'
 import { createHtmlAnalysisService } from './services/html-analysis.service.js'
 import { auditScorer } from './scoring/audit-scorer.js'
@@ -23,6 +24,14 @@ export function createApp(options = {}) {
   const auditMaxConcurrent = config.AUDIT_MAX_CONCURRENT ?? 5
   const auditMaxQueueSize = config.AUDIT_MAX_QUEUE_SIZE ?? 50
   const auditQueueTimeoutMs = config.AUDIT_QUEUE_TIMEOUT_MS ?? 2000
+  const auditRateLimitEnabled = config.AUDIT_RATE_LIMIT_ENABLED ?? true
+  const auditRateLimitWindowMs = config.AUDIT_RATE_LIMIT_WINDOW_MS ?? 60000
+  const auditRateLimitMaxRequests = config.AUDIT_RATE_LIMIT_MAX_REQUESTS ?? 30
+  const auditRateLimitMaxClients = config.AUDIT_RATE_LIMIT_MAX_CLIENTS ?? 10000
+  const trustProxy = config.TRUST_PROXY ?? false
+
+  app.set('trust proxy', trustProxy)
+  app.locals.config = config
 
   app.locals.destinationSafetyService = options.destinationSafetyService ?? createDestinationSafetyService({
     resolver: options.resolver
@@ -49,11 +58,17 @@ export function createApp(options = {}) {
     setTimer: options.setTimer,
     clearTimer: options.clearTimer
   })
+  app.locals.auditRateLimiter = options.auditRateLimiter ?? createFixedWindowRateLimiter({
+    enabled: auditRateLimitEnabled,
+    windowMs: auditRateLimitWindowMs,
+    maxRequests: auditRateLimitMaxRequests,
+    maxClients: auditRateLimitMaxClients,
+    clock: options.rateLimitClock ?? options.clock
+  })
 
   app.disable('x-powered-by')
   app.use(requestIdMiddleware)
   app.use(createRequestLogger(logger))
-  app.use(express.json({ limit: config.REQUEST_BODY_LIMIT }))
   app.use(healthRouter)
   app.use(auditRouter)
   app.use(notFoundMiddleware)

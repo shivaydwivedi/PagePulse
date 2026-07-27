@@ -20,6 +20,32 @@ const booleanSchema = z.preprocess((value) => {
   return value
 }, z.boolean())
 
+const trustProxySchema = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value
+  }
+
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return value
+  }
+
+  if (trimmedValue === 'true') {
+    return true
+  }
+
+  if (trimmedValue === 'false') {
+    return false
+  }
+
+  if (/^(0|[1-9]|10)$/.test(trimmedValue)) {
+    return Number(trimmedValue)
+  }
+
+  return value
+}, z.union([z.boolean(), z.number().int().min(0).max(10)]))
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -37,7 +63,12 @@ const envSchema = z.object({
   AUDIT_CACHE_MAX_ENTRIES: z.coerce.number().int().min(1).max(5000).default(500),
   AUDIT_MAX_CONCURRENT: z.coerce.number().int().min(1).max(50).default(5),
   AUDIT_MAX_QUEUE_SIZE: z.coerce.number().int().min(0).max(500).default(50),
-  AUDIT_QUEUE_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(2000)
+  AUDIT_QUEUE_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(2000),
+  AUDIT_RATE_LIMIT_ENABLED: booleanSchema.default(true),
+  AUDIT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+  AUDIT_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(10000).default(30),
+  AUDIT_RATE_LIMIT_MAX_CLIENTS: z.coerce.number().int().min(1).max(100000).default(10000),
+  TRUST_PROXY: trustProxySchema.default(false)
 })
 
 export function parseEnv(source = process.env) {

@@ -1,5 +1,6 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import { createAuditController } from '../controllers/audit.controller.js'
+import { createAuditRateLimitMiddleware } from '../middleware/audit-rate-limit.middleware.js'
 import { AppError } from '../utils/errors.js'
 
 export const auditRouter = Router()
@@ -21,4 +22,12 @@ function requireJsonWhenBodyPresent(req, _res, next) {
   next()
 }
 
-auditRouter.post('/api/v1/audits', requireJsonWhenBodyPresent, createAuditController)
+function auditRateLimit(req, res, next) {
+  createAuditRateLimitMiddleware(req.app.locals.auditRateLimiter)(req, res, next)
+}
+
+function parseAuditJson(req, res, next) {
+  express.json({ limit: req.app.locals.config.REQUEST_BODY_LIMIT })(req, res, next)
+}
+
+auditRouter.post('/api/v1/audits', auditRateLimit, parseAuditJson, requireJsonWhenBodyPresent, createAuditController)

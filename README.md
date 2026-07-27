@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 7 adds bounded in-memory TTL caching and per-process audit concurrency control on top of deterministic scoring, safe outbound HTTP transport, and HTML analysis. The API now validates and normalises audit URLs, checks the cache, bounds concurrent cache-miss audits, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, issues, and calculates a transparent project-specific PagePulse score.
+Phase 8 adds configurable per-client fixed-window rate limiting for the audit endpoint on top of bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, and HTML analysis. The API now rate-limits audit attempts, validates and normalises audit URLs, checks the cache, bounds concurrent cache-miss audits, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, issues, and calculates a transparent project-specific PagePulse score.
 
-Per-client rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
+CI, deployment, and the public demonstration interface are not implemented yet.
 
 ## Technology Stack
 
@@ -72,6 +72,11 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 | `AUDIT_MAX_CONCURRENT` | `5` | Integer from `1` to `50` | Maximum active cache-miss audits |
 | `AUDIT_MAX_QUEUE_SIZE` | `50` | Integer from `0` to `500` | Maximum FIFO queue depth for waiting audits |
 | `AUDIT_QUEUE_TIMEOUT_MS` | `2000` | Integer from `100` to `30000` | Maximum time a request may wait for an audit permit |
+| `AUDIT_RATE_LIMIT_ENABLED` | `true` | `true`, `false`, `1`, `0` | Enables per-client audit endpoint rate limiting |
+| `AUDIT_RATE_LIMIT_WINDOW_MS` | `60000` | Integer from `1000` to `3600000` | Fixed rate-limit window length in milliseconds |
+| `AUDIT_RATE_LIMIT_MAX_REQUESTS` | `30` | Integer from `1` to `10000` | Maximum audit attempts per client per window |
+| `AUDIT_RATE_LIMIT_MAX_CLIENTS` | `10000` | Integer from `1` to `100000` | Maximum in-memory client buckets |
+| `TRUST_PROXY` | `false` | `false`, `true`, or integer from `0` to `10` | Express trust-proxy setting for client IP resolution |
 
 ## Available Scripts
 
@@ -103,7 +108,7 @@ Every response includes an `X-Request-ID` header.
 
 ### `POST /api/v1/audits`
 
-Validates, normalises, checks the audit cache, safety-checks and fetches a cache miss, extracts deterministic HTML audit signals, and calculates a transparent PagePulse score. In Phase 7, this endpoint returns transport metadata, cache state, score, grade, scoring breakdown, page metadata, checks, and issues.
+Rate-limits the audit attempt, validates, normalises, checks the audit cache, safety-checks and fetches a cache miss, extracts deterministic HTML audit signals, and calculates a transparent PagePulse score. In Phase 8, this endpoint returns the same JSON body as Phase 7 and exposes rate-limit state through headers only.
 
 Request body:
 
@@ -381,12 +386,118 @@ Current public error codes:
 | `UPSTREAM_REQUEST_FAILED` | 502 | Controlled fallback for other upstream transport failures |
 | `HTML_ANALYSIS_FAILED` | 422 | Upstream HTML could not be parsed for analysis |
 | `AUDIT_CAPACITY_EXCEEDED` | 503 | Active audit capacity is full, the FIFO queue is full, or a queued audit waited too long for a permit |
+| `RATE_LIMIT_EXCEEDED` | 429 | Client exceeded the configured audit request limit for the current fixed window |
+| `RATE_LIMITER_UNAVAILABLE` | 503 | Audit request limiting failed closed because the limiter could not make a safe decision |
 | `NOT_FOUND` | 404 | Route was not found |
 | `INTERNAL_ERROR` | 500 | Unexpected application error |
 
+## Rate Limiting
+
+Phase 8 applies a custom fixed-window rate limiter only to `POST /api/v1/audits`. Health, API-root, unknown-route, and future static-asset requests are not rate-limited. The limiter is in-memory and per-process; counters reset on process restart, horizontally scaled instances do not share counters, and distributed rate limiting would require shared infrastructure.
+
+```mermaid
+flowchart TD
+    Request["POST /api/v1/audits"] --> Identity["Resolve client IP with Express req.ip"]
+    Identity --> Consume["Consume fixed-window quota"]
+    Consume -->|Allowed| Headers["Set RateLimit headers"]
+    Headers --> Parse["Parse audit JSON and enforce content type"]
+    Parse --> Audit["Continue to validation, cache, semaphore, transport, analysis, scoring"]
+    Consume -->|Exceeded| Reject["Return 429 RATE_LIMIT_EXCEEDED"]
+    Consume -->|Limiter failure| Unavailable["Return 503 RATE_LIMITER_UNAVAILABLE"]
+```
+
+Client identity policy:
+
+- PagePulse uses Express `req.ip` as the client source.
+- `TRUST_PROXY=false` is the default; direct socket IP is authoritative and spoofed `X-Forwarded-For` values are ignored.
+- `TRUST_PROXY=true` enables Express proxy trust, so forwarded client identity is respected according to Express behaviour.
+- `TRUST_PROXY` may also be an integer hop count from `0` through `10`.
+- Empty, whitespace-only, decimal, comma-separated, and arbitrary string `TRUST_PROXY` values are rejected during configuration loading.
+- PagePulse does not manually parse arbitrary forwarded headers. Incorrect proxy trust configuration can allow spoofing or collapse clients into incorrect buckets.
+- Client keys trim surrounding whitespace, lowercase text, preserve IPv6 consistently, and normalise IPv4-mapped IPv6 such as `::ffff:127.0.0.1` to `127.0.0.1`.
+- Missing or empty client IPs use the shared fallback bucket `unknown-client`.
+- Request IDs and requested audit URLs are never used as client keys.
+
+Fixed-window algorithm:
+
+- The first audit attempt for a client starts a fixed window.
+- Requests up to `AUDIT_RATE_LIMIT_MAX_REQUESTS` are allowed.
+- Request `maxRequests + 1` is rejected with `RATE_LIMIT_EXCEEDED`.
+- `now < resetAt` remains in the same window; `now >= resetAt` starts a new window.
+- Allowed and rejected requests do not extend the reset time; this is not a sliding-window, token-bucket, API-key, authentication, user-account, DDoS-prevention, or WAF system.
+- Rejected requests keep the stored count capped at the configured maximum.
+
+Bounded client storage:
+
+- The limiter stores at most `AUDIT_RATE_LIMIT_MAX_CLIENTS` buckets.
+- Expired buckets are removed lazily; no background cleanup timer is created.
+- If storage is still full, the least-recently-seen client is evicted deterministically.
+- Allowed and rejected requests update client recency.
+- An evicted client can begin a fresh window if it returns. This is a deliberate bounded-memory tradeoff.
+- Disabled rate limiting stores no buckets and emits no rate-limit headers.
+
+Rate-limit headers:
+
+| Header | Meaning |
+| --- | --- |
+| `RateLimit-Limit` | Configured maximum audit attempts per window |
+| `RateLimit-Remaining` | Remaining attempts after the current request is consumed |
+| `RateLimit-Reset` | Whole seconds until the current fixed window resets, rounded up |
+| `Retry-After` | Present only on rejected 429 responses; whole seconds until retry, minimum `1` |
+
+Worked example with `AUDIT_RATE_LIMIT_MAX_REQUESTS=3`:
+
+```text
+Request 1 -> 200, RateLimit-Limit: 3, RateLimit-Remaining: 2
+Request 2 -> 200, RateLimit-Limit: 3, RateLimit-Remaining: 1
+Request 3 -> 200, RateLimit-Limit: 3, RateLimit-Remaining: 0
+Request 4 -> 429, RateLimit-Remaining: 0, Retry-After: positive integer
+```
+
+Rate-limit response:
+
+```json
+{
+  "success": false,
+  "requestId": "request-id",
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many audit requests. Please try again later.",
+    "details": [
+      {
+        "retryAfterSeconds": 17
+      }
+    ]
+  }
+}
+```
+
+Limiter-unavailable response:
+
+```json
+{
+  "success": false,
+  "requestId": "request-id",
+  "error": {
+    "code": "RATE_LIMITER_UNAVAILABLE",
+    "message": "Audit request limiting is temporarily unavailable.",
+    "details": []
+  }
+}
+```
+
+Interaction with cache and concurrency:
+
+- Rate limiting runs before audit JSON parsing, content-type checks, request validation, cache lookup, and semaphore acquisition.
+- Malformed JSON, unsupported audit media types, ordinary validation failures, blocked targets, cache hits, cache misses, capacity failures, analyser errors, scorer errors, and successful audits all consume quota after a client identity is resolved.
+- Cache hits count toward the client limit.
+- Already over-limit requests are rejected before JSON parsing, content-type validation, cache lookup, semaphore acquisition, DNS, transport, analysis, or scoring. They do not read the audit cache, do not change cache recency, do not acquire semaphore permits, and do not enter the audit queue.
+- Queue-full capacity failures and rate-limit failures remain distinct: capacity uses HTTP `503` with `AUDIT_CAPACITY_EXCEEDED`; rate limiting uses HTTP `429` with `RATE_LIMIT_EXCEEDED`.
+- If an injected limiter throws or returns a malformed decision, PagePulse fails closed with `RATE_LIMITER_UNAVAILABLE`, omits misleading rate-limit headers, and performs no audit/cache/semaphore work. Injected decisions must be plain objects with only `allowed`, `limit`, `remaining`, `resetAt`, and `retryAfterSeconds`, and the numeric fields must be finite non-negative integers with internally consistent allowed/rejected values.
+
 ## Cache And Concurrency
 
-Phase 7 uses a custom per-process in-memory TTL cache and a custom per-process asynchronous semaphore. This is appropriate for the current single-instance API shape. The cache is cleared on restart, horizontally scaled instances do not share entries, and distributed deployment would require shared cache or coordinated capacity infrastructure.
+Phase 7 introduced a custom per-process in-memory TTL cache and a custom per-process asynchronous semaphore. This is appropriate for the current single-instance API shape. The cache is cleared on restart, horizontally scaled instances do not share entries, and distributed deployment would require shared cache or coordinated capacity infrastructure.
 
 ```mermaid
 flowchart TD
