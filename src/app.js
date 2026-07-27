@@ -4,6 +4,7 @@ import { createLogger, createRequestLogger } from './infrastructure/logging/logg
 import { errorMiddleware } from './middleware/error.middleware.js'
 import { notFoundMiddleware } from './middleware/not-found.middleware.js'
 import { requestIdMiddleware } from './middleware/request-id.middleware.js'
+import { auditRouter } from './routes/audit.routes.js'
 import { healthRouter } from './routes/health.routes.js'
 
 export function createApp(options = {}) {
@@ -16,6 +17,7 @@ export function createApp(options = {}) {
   app.use(createRequestLogger(logger))
   app.use(express.json({ limit: config.REQUEST_BODY_LIMIT }))
   app.use(healthRouter)
+  app.use(auditRouter)
   app.use(notFoundMiddleware)
   app.use(errorMiddleware)
 
