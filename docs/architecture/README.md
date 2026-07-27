@@ -1,14 +1,14 @@
 # PagePulse Architecture
 
-This directory explains the current PagePulse backend architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, and where planned frontend or deployment decisions remain open.
+This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, and where deployment decisions remain open.
 
 Back to the [root README](../../README.md).
 
 ## Current System Status
 
-Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured locally. Phase 9B adds this architecture documentation system.
+Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured locally. Phase 9B adds this architecture documentation system. Phase 10 adds the public demo UI served by the existing Express application.
 
-The public frontend and deployment architecture are planned only. These documents do not claim a deployed service, measured Lighthouse result, or chosen frontend framework.
+Deployment architecture is planned only. These documents do not claim a deployed service or measured Lighthouse result.
 
 ## Navigation
 
@@ -24,7 +24,7 @@ The public frontend and deployment architecture are planned only. These document
 | [Observability and errors](observability-and-errors.md) | Request IDs, logs, error envelopes, and public codes | Implemented | [error-handling-flow.mmd](../diagrams/error-handling-flow.mmd) |
 | [CI and quality gates](ci-and-quality-gates.md) | GitHub Actions, coverage, audit, hygiene, and templates | Implemented | [ci-quality-flow.mmd](../diagrams/ci-quality-flow.mmd) |
 | [Architecture decisions](architecture-decisions.md) | ADR-style index of current design choices | Implemented | None |
-| [Future frontend architecture](future-frontend-architecture.md) | Planned public UI goals and open frontend decisions | Planned | None |
+| [Future frontend architecture](future-frontend-architecture.md) | Public UI architecture and remaining measurement limits | Implemented | [system-context.mmd](../diagrams/system-context.mmd) |
 | [Future deployment architecture](future-deployment-architecture.md) | Planned deployment concerns and undecided hosting choices | Planned | None |
 
 ## Diagram Catalogue

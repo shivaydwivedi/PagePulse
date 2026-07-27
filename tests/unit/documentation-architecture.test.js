@@ -46,12 +46,12 @@ describe('architecture documentation structure', () => {
     }
   })
 
-  it('labels future documents as planned without claiming completed frontend or deployment work', () => {
+  it('labels frontend as implemented and deployment as planned without claiming measurements or deployment', () => {
     const frontend = readText('docs/architecture/future-frontend-architecture.md')
     const deployment = readText('docs/architecture/future-deployment-architecture.md')
 
-    expect(frontend).toContain('Status: Planned')
-    expect(frontend).toContain('Frontend framework decision pending')
+    expect(frontend).toContain('Status: Implemented')
+    expect(frontend).toContain('No frontend framework')
     expect(frontend).toContain('has not been measured')
     expect(frontend).not.toContain('LCP has been measured')
     expect(deployment).toContain('Status: Planned')

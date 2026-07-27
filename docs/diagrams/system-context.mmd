@@ -1,5 +1,7 @@
 flowchart TD
-  APIClient[API Client] --> ExpressAPI[PagePulse Express API]
+  Browser[Browser UI] --> ExpressAPI[PagePulse Express App]
+  APIClient[API Client] --> ExpressAPI
+  ExpressAPI --> StaticUI[Static public files]
   ExpressAPI --> RequestID[Request ID]
   ExpressAPI --> RateLimiter[Rate Limiter]
   RateLimiter --> Cache[Cache]

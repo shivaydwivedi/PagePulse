@@ -1,5 +1,6 @@
 flowchart TD
-  Request[POST audit request] --> RequestID[Create request ID]
+  UI[Public UI or API client] --> Request[POST audit request]
+  Request --> RequestID[Create request ID]
   RequestID --> Logging[Structured request logging]
   Logging --> RateLimit[Rate limit decision]
   RateLimit -->|Exceeded| RateReject[429 rate limit response]
