@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources. Phase 10 adds a lightweight public demo UI served by the existing Express application.
+Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources. Phase 10 adds a lightweight public demo UI served by the existing Express application. Phase 11A prepares Northflank deployment documentation and readiness checks.
 
-The CI workflow is configured and will run on pushes and pull requests after this branch is merged. The public demonstration UI is implemented; deployment remains pending.
+The CI workflow is configured and will run on pushes and pull requests after this branch is merged. The public demonstration UI is implemented; deployment is prepared but not live.
 
 ## Technology Stack
 
@@ -78,6 +78,17 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 | `AUDIT_RATE_LIMIT_MAX_CLIENTS` | `10000` | Integer from `1` to `100000` | Maximum in-memory client buckets |
 | `TRUST_PROXY` | `false` | `false`, `true`, or integer from `0` to `10` | Express trust-proxy setting for client IP resolution |
 
+## Deployment Status
+
+- Provider selected: Northflank.
+- Status: Prepared, not live.
+- Live URL: pending Northflank deployment.
+- Architecture: one Buildpack service serving same-origin UI and API on runtime `PORT=8080`.
+- Storage: no database, volume, or persistent storage.
+- Production verification: pending generated HTTPS URL, health checks, proxy/IP behaviour, logs, and Lighthouse rerun.
+
+Deployment readiness documentation lives in [docs/deployment/README.md](docs/deployment/README.md). The prepared architecture is documented in [docs/architecture/future-deployment-architecture.md](docs/architecture/future-deployment-architecture.md).
+
 ## Available Scripts
 
 - `npm start`: start the production server
@@ -88,7 +99,7 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 - `npm run lint`: run ESLint
 - `npm run check`: run lint and tests
 - `npm run check:hygiene`: reject commonly sensitive or generated tracked files
-- `npm run check:docs`: verify required architecture documentation and diagram structure
+- `npm run check:docs`: verify required architecture, deployment, performance, screenshot, and diagram documentation structure
 - `npm run ci`: run the local CI-equivalent lint, coverage, documentation, and hygiene checks
 
 ## Public Demo UI
@@ -101,7 +112,7 @@ Theme modes are Light, Dark and System. Explicit choices are stored under `pagep
 
 Accessibility features include semantic landmarks, a skip link, visible labels, keyboard-accessible controls, focus states, `aria-live` status messaging, `aria-busy` during audits, non-colour-only statuses, responsive wrapping, and reduced-motion support.
 
-The page is LCP-conscious by construction: the main heading and form are in initial HTML, JavaScript is module-loaded, there are no remote fonts, no external scripts or stylesheets, no frontend framework, no chart library, and no raster assets. Lighthouse measurement is pending and no measured LCP claim is made in this phase.
+The page is LCP-conscious by construction: the main heading and form are in initial HTML, JavaScript is module-loaded, there are no remote fonts, no external scripts or stylesheets, no frontend framework, no chart library, and no raster runtime assets. Local Lighthouse lab measurement is documented below; production measurement is still pending until deployment exists.
 
 The footer visibly includes the required `Built for Digital Heroes Training Task` attribution linking to `https://digitalheroesco.com`.
 
@@ -134,7 +145,7 @@ Key documents:
 - [CI and quality gates](docs/architecture/ci-and-quality-gates.md)
 - [Architecture decisions](docs/architecture/architecture-decisions.md)
 
-Frontend architecture is implemented for the current plain HTML, CSS and JavaScript UI. Deployment architecture remains planned only; no hosting provider or deployed environment has been selected.
+Frontend architecture is implemented for the current plain HTML, CSS and JavaScript UI. Deployment architecture is prepared for Northflank but is not live.
 
 ## Project Structure
 

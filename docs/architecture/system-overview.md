@@ -2,7 +2,7 @@
 
 Status: Implemented
 
-PagePulse is a Node.js 22 Express application that serves a lightweight public demo UI and a JSON audit API. The UI submits same-origin audit requests from the browser. The API safely fetches one HTML page, analyses bounded page signals, scores the result, and returns a sanitized JSON envelope. The current system has no database and keeps cache, concurrency, and rate-limit state in process memory.
+PagePulse is a Node.js 22 Express application that serves a lightweight public demo UI and a JSON audit API. The UI submits same-origin audit requests from the browser. The API safely fetches one HTML page, analyses bounded page signals, scores the result, and returns a sanitized JSON envelope. The current system has no database and keeps cache, concurrency, queue, and rate-limit state in process memory.
 
 Back to the [architecture index](README.md). Diagram source: [system-context.mmd](../diagrams/system-context.mmd).
 
@@ -47,8 +47,8 @@ The public UI owns browser-side presentation, same-origin API calls, theme prefe
 
 ## Process-Local State
 
-The TTL cache, semaphore, and fixed-window rate limiter are process-local. They reset on process restart and are not shared across horizontally scaled instances.
+The TTL cache, semaphore, queue, and fixed-window rate limiter are process-local. They reset on process restart and are not shared across horizontally scaled instances. Phase 11A prepares a one-instance Northflank deployment, so distributed state is intentionally not introduced.
 
 ## Current Limitations
 
-PagePulse is not deployed in this phase, does not use a database, and does not provide distributed cache or distributed rate limiting. The public UI has not received Lighthouse measurement yet. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.
+PagePulse is prepared for Northflank but is not live, does not use a database, and does not provide distributed cache or distributed rate limiting. CI is configured locally but remote GitHub execution must be proven after the first push or pull request.

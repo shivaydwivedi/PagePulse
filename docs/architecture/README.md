@@ -1,14 +1,14 @@
 # PagePulse Architecture
 
-This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, where local performance measurements live, and where deployment decisions remain open.
+This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, where local performance measurements live, and what deployment work is prepared but not live.
 
 Back to the [root README](../../README.md).
 
 ## Current System Status
 
-Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured locally. Phase 9B adds this architecture documentation system. Phase 10 adds the public demo UI served by the existing Express application.
+Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured locally. Phase 9B adds this architecture documentation system. Phase 10 adds the public demo UI served by the existing Express application. Phase 11A prepares a single-service Northflank deployment, but the app is not live.
 
-Deployment architecture is planned only. Local Lighthouse lab measurements are recorded separately and do not claim production field data.
+Deployment architecture status is Prepared, not Implemented. Local Lighthouse lab measurements are recorded separately and do not claim production field data.
 
 ## Navigation
 
@@ -25,11 +25,12 @@ Deployment architecture is planned only. Local Lighthouse lab measurements are r
 | [CI and quality gates](ci-and-quality-gates.md) | GitHub Actions, coverage, audit, hygiene, and templates | Implemented | [ci-quality-flow.mmd](../diagrams/ci-quality-flow.mmd) |
 | [Architecture decisions](architecture-decisions.md) | ADR-style index of current design choices | Implemented | None |
 | [Future frontend architecture](future-frontend-architecture.md) | Public UI architecture and remaining measurement limits | Implemented | [system-context.mmd](../diagrams/system-context.mmd) |
-| [Future deployment architecture](future-deployment-architecture.md) | Planned deployment concerns and undecided hosting choices | Planned | None |
+| [Future deployment architecture](future-deployment-architecture.md) | Prepared Northflank deployment shape and remaining live checks | Prepared | [deployment-flow.mmd](../diagrams/deployment-flow.mmd) |
 
 Performance documentation:
 
 - [Lighthouse performance report](../performance/lighthouse-report.md)
+- [Deployment readiness](../deployment/README.md)
 
 ## Diagram Catalogue
 

@@ -158,3 +158,14 @@ Back to the [architecture index](README.md).
 - Reason: Median lab results are more useful than a single best run, while avoiding field-data or production claims before deployment exists.
 - Consequences: Local results must be remeasured after hosting, TLS, CDN, and production caching decisions exist.
 - Future reconsideration trigger: Deployment or product requirements introduce a build pipeline, CDN policy, or real-user monitoring.
+
+## ADR-018 Northflank Single-Service Deployment
+
+- Decision: Prepare PagePulse for one Northflank Developer Sandbox service.
+- Context: The qualification project needs a simple production-like deployment path without adding infrastructure that the current product does not use.
+- Choice: Buildpack from repository root, `npm start`, one Node.js instance, public HTTP port `8080`, Northflank-managed HTTPS, and same-origin UI/API.
+- Reason: The existing Express app already serves both UI and API, has `GET /healthz`, uses process-local state intentionally, and does not need a database, volume, worker, or external runtime assets.
+- Consequences: Cache, queue, semaphore, and rate-limit buckets reset on restart and are not shared across instances. Autoscaling is intentionally disabled for this training deployment.
+- Live verification requirement: `TRUST_PROXY` must remain pending until Northflank forwarding behaviour is observed in the deployed service.
+- Rollback policy: Prefer Northflank rollback to a known good deployment or a reviewed Git revert on `main`, followed by the post-deployment verification checklist.
+- Future reconsideration trigger: Requirements need multiple instances, persisted reports, authenticated quotas, shared rate limiting, or managed deployment automation.

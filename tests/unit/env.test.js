@@ -27,6 +27,7 @@ describe('environment configuration', () => {
   })
 
   it('rejects an invalid port', () => {
+    expect(parseEnv({ PORT: '8080' }).PORT).toBe(8080)
     expect(() => parseEnv({ PORT: '70000' })).toThrow()
     expect(() => parseEnv({ PORT: 'not-a-port' })).toThrow()
   })
