@@ -32,7 +32,17 @@ function createTestApp() {
           responseTimeMs: 7,
           redirectCount: 0,
           auditedAt: '2026-07-27T00:00:00.000Z',
-          body: Buffer.from('<h1>ok</h1>')
+          body: Buffer.from(`
+            <html lang="en">
+              <head>
+                <title>Example Domain Page</title>
+                <meta name="description" content="This is a useful page summary written for deterministic route tests.">
+                <link rel="canonical" href="https://example.com/path?q=1">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+              </head>
+              <body><h1>Example Domain</h1></body>
+            </html>
+          `)
         }
       }
     }
@@ -59,12 +69,25 @@ describe('POST /api/v1/audits', () => {
         contentType: 'text/html',
         responseSizeBytes: 12,
         auditedAt: '2026-07-27T00:00:00.000Z',
-        auditStatus: 'transport_complete'
+        auditStatus: 'analysis_complete',
+        page: {
+          title: 'Example Domain Page',
+          metaDescription: 'This is a useful page summary written for deterministic route tests.',
+          canonicalUrl: 'https://example.com/path?q=1',
+          language: 'en',
+          headingCount: 1,
+          imageCount: 0,
+          linkCount: 0
+        },
+        checks: expect.any(Object),
+        issues: expect.any(Array)
       }
     })
-    expect(JSON.stringify(response.body)).not.toContain('<h1>ok</h1>')
+    expect(JSON.stringify(response.body)).not.toContain('<h1>Example Domain</h1>')
     expect(JSON.stringify(response.body)).not.toContain('session=secret')
     expect(JSON.stringify(response.body)).not.toContain('raw-upstream-value')
+    expect(response.body.data.score).toBeUndefined()
+    expect(response.body.data.grade).toBeUndefined()
     expect(response.headers['set-cookie']).toBeUndefined()
   })
 

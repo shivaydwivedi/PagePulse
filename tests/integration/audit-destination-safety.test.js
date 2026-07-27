@@ -41,7 +41,7 @@ describe('audit destination safety integration', () => {
     expect(response.body.data).toMatchObject({
       requestedUrl: 'https://example.com/path?q=1',
       finalUrl: 'https://example.com/path?q=1',
-      auditStatus: 'transport_complete'
+      auditStatus: 'analysis_complete'
     })
   })
 
