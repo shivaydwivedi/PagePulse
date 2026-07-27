@@ -23,6 +23,7 @@ describe('public UI assets', () => {
     expect(html).toContain('<script type="module" src="/app.js"></script>')
     expect(html).toContain('<link rel="modulepreload" href="/ui-core.js">')
     expect(html).toContain('<link rel="stylesheet" href="/styles.css">')
+    expect(html).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">')
     const externalReferences = [...html.matchAll(/\b(?:src|href)="(https?:\/\/[^"]+)"/g)].map((match) => match[1])
     expect(externalReferences).toEqual(['https://digitalheroesco.com'])
     expect(combined).not.toContain('React')
@@ -106,6 +107,7 @@ describe('public UI assets', () => {
     const binaryExtensions = files.filter((file) => /\.(png|jpg|jpeg|webp|gif|ico)$/i.test(file))
 
     expect(binaryExtensions).toEqual([])
+    expect(files).toContain(path.join('public', 'favicon.svg'))
     expect(files).toContain(path.join('public', 'assets', 'pagepulse-mark.svg'))
     for (const file of files) {
       expect(statSync(file).size, file).toBeLessThan(50000)
@@ -118,7 +120,16 @@ describe('public UI assets', () => {
     expect(statSync('public/index.html').size).toBeLessThan(15 * 1024)
     expect(statSync('public/styles.css').size).toBeLessThan(25 * 1024)
     expect(totalJavaScript).toBeLessThan(40 * 1024)
+    expect(statSync('public/favicon.svg').size).toBeLessThan(5 * 1024)
     expect(statSync('public/assets/pagepulse-mark.svg').size).toBeLessThan(5 * 1024)
+  })
+
+  it('keeps the favicon lightweight, local, and script-free', () => {
+    const svg = readText('public/favicon.svg')
+
+    expect(svg).toContain('<svg')
+    expect(svg).not.toContain('<script')
+    expect(svg).not.toContain('href=')
   })
 
   it('keeps the decorative SVG mark free of accessible-name duplication and scripts', () => {

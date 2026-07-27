@@ -1,4 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
+
+export const liveRenderUrl = 'https://pagepulse-3gub.onrender.com'
 
 export const requiredArchitectureFiles = [
   'docs/architecture/README.md',
@@ -38,6 +41,7 @@ export const requiredDeploymentFiles = [
   'docs/deployment/README.md',
   'docs/deployment/render-configuration.md',
   'docs/deployment/production-environment.md',
+  'docs/deployment/production-verification-report.md',
   'docs/deployment/operations-and-rollback.md',
   'docs/deployment/post-deployment-verification.md'
 ]
@@ -52,17 +56,58 @@ export const requiredScreenshotFiles = [
 const mermaidKeywords = ['flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram', 'erDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'timeline']
 const windowsPathPattern = /[A-Za-z]:\\(?:Users|[^ \n\r\t]*)/
 const localFileLinkPattern = /\]\(\/[A-Za-z]:\//
+const markdownLinkPattern = /!?\[[^\]]*]\(([^)]+)\)/g
+const activeDocs = [
+  'README.md',
+  ...requiredArchitectureFiles,
+  ...requiredDeploymentFiles,
+  ...requiredDiagramFiles,
+  ...requiredPerformanceFiles
+]
 
-function readText(path) {
-  return readFileSync(path, 'utf8')
+function readText(file) {
+  return readFileSync(file, 'utf8')
 }
 
-function isNonEmpty(path) {
-  return readText(path).trim().length > 0
+function isNonEmpty(file) {
+  return readText(file).trim().length > 0
 }
 
 function hasUnsafeLocalPath(text) {
   return windowsPathPattern.test(text) || localFileLinkPattern.test(text)
+}
+
+function isExternalTarget(target) {
+  return /^(https?:|mailto:|#)/i.test(target)
+}
+
+function stripLinkSuffix(target) {
+  return target.split('#')[0].split('?')[0]
+}
+
+function validateReadmeLinks(rootReadme, errors) {
+  for (const match of rootReadme.matchAll(markdownLinkPattern)) {
+    const rawTarget = match[1].trim()
+    if (!rawTarget || isExternalTarget(rawTarget)) {
+      continue
+    }
+
+    const target = stripLinkSuffix(rawTarget)
+    if (!target) {
+      continue
+    }
+
+    const resolved = path.normalize(target)
+    if (!existsSync(resolved)) {
+      errors.push(`Root README link does not resolve: ${rawTarget}`)
+    }
+  }
+}
+
+function validateNoPrivateRenderData(text, file, errors) {
+  if (/srv-[a-z0-9]{8,}/i.test(text) || /render\.com\/dashboard/i.test(text)) {
+    errors.push(`Documentation file may include private Render identifiers: ${file}`)
+  }
 }
 
 export function validateDocumentationStructure() {
@@ -88,6 +133,18 @@ export function validateDocumentationStructure() {
     if (hasUnsafeLocalPath(text)) {
       errors.push(`Documentation file contains an absolute local path: ${file}`)
     }
+    validateNoPrivateRenderData(text, file, errors)
+  }
+
+  const rootReadme = existsSync('README.md') ? readText('README.md') : ''
+  if (!rootReadme) {
+    errors.push('Root README is missing or empty.')
+  } else {
+    if (hasUnsafeLocalPath(rootReadme)) {
+      errors.push('Root README contains an absolute local path.')
+    }
+    validateNoPrivateRenderData(rootReadme, 'README.md', errors)
+    validateReadmeLinks(rootReadme, errors)
   }
 
   const architectureIndex = existsSync('docs/architecture/README.md') ? readText('docs/architecture/README.md') : ''
@@ -132,13 +189,19 @@ export function validateDocumentationStructure() {
     }
   }
 
-  if (existsSync('README.md') && !readText('README.md').includes('docs/architecture/README.md')) {
-    errors.push('Root README does not link the architecture index.')
-  }
-
-  const rootReadme = existsSync('README.md') ? readText('README.md') : ''
-  if (rootReadme && !rootReadme.includes('docs/deployment/README.md')) {
-    errors.push('Root README does not link the deployment readiness documentation.')
+  for (const requiredText of [
+    liveRenderUrl,
+    'Status: Implemented',
+    'Provider: Render',
+    'Render Free',
+    'cold start',
+    'TRUST_PROXY',
+    'HSTS',
+    'Digital Heroes Training Task'
+  ]) {
+    if (!rootReadme.includes(requiredText)) {
+      errors.push(`Root README is missing required text: ${requiredText}`)
+    }
   }
 
   for (const file of requiredScreenshotFiles) {
@@ -152,6 +215,16 @@ export function validateDocumentationStructure() {
     }
   }
 
+  if (!existsSync('public/favicon.svg')) {
+    errors.push('Public favicon asset is missing: public/favicon.svg')
+  } else if (statSync('public/favicon.svg').size <= 0) {
+    errors.push('Public favicon asset is empty: public/favicon.svg')
+  }
+
+  if (!rootReadme.includes('not Lighthouse') || !rootReadme.includes('not a browser-rendering engine') || !rootReadme.includes('not a Core Web Vitals measurement service')) {
+    errors.push('Root README must clearly distinguish PagePulse from Lighthouse, browser rendering, and Core Web Vitals measurement.')
+  }
+
   const performanceReport = existsSync('docs/performance/lighthouse-report.md') ? readText('docs/performance/lighthouse-report.md') : ''
   for (const requiredText of ['Measurement Conditions', 'Median', 'lab results', 'not field data', 'LCP', 'CLS']) {
     if (!performanceReport.includes(requiredText)) {
@@ -163,70 +236,92 @@ export function validateDocumentationStructure() {
     errors.push('Performance report must not claim production field data.')
   }
 
-  const deploymentReadme = existsSync('docs/deployment/README.md') ? readText('docs/deployment/README.md') : ''
-  const renderConfig = existsSync('docs/deployment/render-configuration.md') ? readText('docs/deployment/render-configuration.md') : ''
-  const productionEnv = existsSync('docs/deployment/production-environment.md') ? readText('docs/deployment/production-environment.md') : ''
-  const rollback = existsSync('docs/deployment/operations-and-rollback.md') ? readText('docs/deployment/operations-and-rollback.md') : ''
-  const verification = existsSync('docs/deployment/post-deployment-verification.md') ? readText('docs/deployment/post-deployment-verification.md') : ''
-  const deploymentCombined = [deploymentReadme, renderConfig, productionEnv, rollback, verification].join('\n')
-
-  if (existsSync('docs/deployment/northflank-configuration.md')) {
-    errors.push('Obsolete Northflank deployment configuration must not remain active.')
-  }
+  const deploymentCombined = requiredDeploymentFiles
+    .filter((file) => existsSync(file))
+    .map((file) => readText(file))
+    .join('\n')
 
   for (const requiredText of [
-    'Status: Prepared',
-    'not live',
+    liveRenderUrl,
+    'Status: Implemented',
     'Provider: Render',
-    'Live URL: pending',
-    'Requires live verification',
-    'rollback',
-    'post-deployment',
     'Web Service',
+    'Repository',
+    'shivaydwivedi/PagePulse',
+    'Branch',
+    'main',
+    'Runtime',
+    'Node',
     'Build command',
     'npm ci',
     'Start command',
     'npm start',
-    'Render supplies `PORT` automatically',
-    'cold start',
+    'Render-managed',
+    'PORT',
+    '10000',
+    'Free',
+    'Auto-deploy',
     'No database',
-    'No persistent disk'
+    'No persistent disk',
+    'cold start',
+    'production-verification-report.md',
+    'TRUST_PROXY',
+    'left unset',
+    'HSTS',
+    'max-age=2592000'
   ]) {
     if (!deploymentCombined.includes(requiredText)) {
       errors.push(`Deployment documentation is missing required text: ${requiredText}`)
     }
   }
 
-  if (!deploymentCombined.includes('TRUST_PROXY') || !deploymentCombined.includes('Pending')) {
-    errors.push('Deployment documentation must mark TRUST_PROXY as pending live verification.')
+  if (!deploymentCombined.includes('https://www.wikipedia.org') || !deploymentCombined.includes('https://www.youtube.com')) {
+    errors.push('Production verification report must include Wikipedia and YouTube audit checks.')
   }
 
-  if (!verification.includes('generated onrender.com HTTPS URL')) {
-    errors.push('Post-deployment checklist must include generated onrender.com HTTPS URL verification.')
+  if (existsSync('docs/deployment/northflank-configuration.md')) {
+    errors.push('Obsolete Northflank deployment configuration must not remain active.')
   }
 
-  if (!verification.includes('Rate-limit headers')) {
-    errors.push('Post-deployment checklist must include rate-limit header verification.')
+  const stalePatterns = [
+    /Status:\s*Prepared,\s*not live/i,
+    /Live URL:\s*pending/i,
+    /pending Render deployment/i,
+    /Status:\s*Pending live deployment/i,
+    /Requires live verification/i,
+    /deployment is prepared but not live/i,
+    /service is not live/i
+  ]
+
+  for (const file of activeDocs) {
+    if (!existsSync(file)) {
+      continue
+    }
+    const text = readText(file)
+    if (stalePatterns.some((pattern) => pattern.test(text))) {
+      errors.push(`Documentation file contains stale pending-live wording: ${file}`)
+    }
   }
 
-  if (!rollback.includes('Git revert rollback') || !rollback.includes('Render rollback')) {
-    errors.push('Rollback documentation must include Render and Git revert paths.')
+  const activeCombined = activeDocs
+    .filter((file) => existsSync(file))
+    .map((file) => readText(file))
+    .join('\n')
+
+  if (/Northflank|northflank/i.test(activeCombined)) {
+    errors.push('Active documentation must not keep stale Northflank references.')
   }
 
-  if (/card (number|data)|credit card number|payment card number/i.test(deploymentCombined)) {
-    errors.push('Deployment documentation must not include payment card data.')
+  if (/https:\/\/(?!pagepulse-3gub\.onrender\.com)[^ \n)]+onrender\.com/i.test(activeCombined)) {
+    errors.push('Documentation contains an unapproved Render URL.')
   }
 
-  if (/https:\/\/(pagepulse|[^ \n)]+(?:northflank|onrender\.com))[^ \n)]*/i.test(deploymentCombined)) {
-    errors.push('Deployment documentation must not present a live deployment URL.')
+  if (/(secret|token|password)\s*[:=]\s*\S+/i.test(activeCombined)) {
+    errors.push('Documentation must not include provider secrets.')
   }
 
-  if (/(secret|token|password)\s*[:=]\s*\S+/i.test(deploymentCombined)) {
-    errors.push('Deployment documentation must not include provider secrets.')
-  }
-
-  if (/Northflank|northflank/i.test(deploymentCombined)) {
-    errors.push('Deployment documentation must not keep Northflank as the active provider.')
+  if (/card (number|data)|credit card number|payment card number/i.test(activeCombined)) {
+    errors.push('Documentation must not include sensitive billing-card values.')
   }
 
   return errors

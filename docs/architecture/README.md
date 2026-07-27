@@ -1,14 +1,14 @@
 # PagePulse Architecture
 
-This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, where local performance measurements live, and what deployment work is prepared but not live.
+This directory explains the current PagePulse architecture for maintainers, reviewers, recruiters, and interview discussions. It records what is implemented today, why key choices were made, where local performance measurements live, and how the Render deployment is structured.
 
 Back to the [root README](../../README.md).
 
 ## Current System Status
 
-Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured locally. Phase 9B adds this architecture documentation system. Phase 10 adds the public demo UI served by the existing Express application. Phase 11B prepares a single-service Render deployment, but the app is not live.
+Backend phases 1 through 8 are implemented: Express application foundation, request validation, destination safety, safe HTTP transport, HTML analysis, deterministic scoring, in-memory caching and concurrency bounds, and per-client audit rate limiting. Phase 9 CI and repository quality gates are configured. Phase 9B adds this architecture documentation system. Phase 10 adds the public demo UI served by the existing Express application. Phase 11B prepares the single-service Render deployment model, and Phase 12 records the live Render deployment at `https://pagepulse-3gub.onrender.com`.
 
-Deployment architecture status is Prepared, not Implemented. Local Lighthouse lab measurements are recorded separately and do not claim production field data.
+Deployment architecture status is Implemented. Local Lighthouse lab measurements are recorded separately and do not claim production field data.
 
 ## Navigation
 
@@ -25,7 +25,7 @@ Deployment architecture status is Prepared, not Implemented. Local Lighthouse la
 | [CI and quality gates](ci-and-quality-gates.md) | GitHub Actions, coverage, audit, hygiene, and templates | Implemented | [ci-quality-flow.mmd](../diagrams/ci-quality-flow.mmd) |
 | [Architecture decisions](architecture-decisions.md) | ADR-style index of current design choices | Implemented | None |
 | [Future frontend architecture](future-frontend-architecture.md) | Public UI architecture and remaining measurement limits | Implemented | [system-context.mmd](../diagrams/system-context.mmd) |
-| [Future deployment architecture](future-deployment-architecture.md) | Prepared Render deployment shape and remaining live checks | Prepared | [deployment-flow.mmd](../diagrams/deployment-flow.mmd) |
+| [Future deployment architecture](future-deployment-architecture.md) | Implemented Render deployment shape and remaining topology limits | Implemented | [deployment-flow.mmd](../diagrams/deployment-flow.mmd) |
 
 Performance documentation:
 

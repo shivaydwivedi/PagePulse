@@ -1,8 +1,9 @@
 flowchart TD
-  GitHubMain["GitHub main branch"] --> RenderBuild["Render build and deploy"]
-  RenderBuild --> Service["Render Web Service: one instance"]
+  GitHubMain["GitHub main branch"] --> RenderBuild["Render build: npm ci"]
+  RenderBuild --> Service["Render Web Service: npm start"]
   Service --> HTTPS["Render-managed HTTPS"]
-  HTTPS --> Express["Express same-origin UI and API"]
+  HTTPS --> LiveURL["https://pagepulse-3gub.onrender.com"]
+  LiveURL --> Express["Express same-origin UI and API"]
   Probe["Render health check"] --> Health["GET /healthz"]
   Health --> Express
   Express --> Logs["Structured logs"]
