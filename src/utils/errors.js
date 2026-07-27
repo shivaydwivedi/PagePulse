@@ -13,6 +13,16 @@ export class AppError extends Error {
       return error
     }
 
+    if (error?.type === 'entity.parse.failed') {
+      return new AppError({
+        code: 'INVALID_JSON',
+        message: 'Request body contains invalid JSON.',
+        statusCode: 400,
+        details: [],
+        cause: error
+      })
+    }
+
     return new AppError({
       code: 'INTERNAL_ERROR',
       message: 'An unexpected error occurred.',
