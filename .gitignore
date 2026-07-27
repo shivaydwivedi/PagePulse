@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+.agents/
+.codex/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+*.log
+.DS_Store
