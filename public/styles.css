@@ -64,6 +64,11 @@ a {
   outline-offset: 3px;
 }
 
+::selection {
+  color: var(--surface);
+  background: var(--accent-strong);
+}
+
 .skip-link {
   position: absolute;
   left: 1rem;
@@ -251,6 +256,11 @@ input[type="url"] {
   border: 1px solid var(--border);
   border-radius: 7px;
   overflow-wrap: anywhere;
+}
+
+input[type="url"]:-webkit-autofill {
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--page) inset;
 }
 
 button {

@@ -97,6 +97,8 @@ describe('public UI assets', () => {
     expect(css).toContain('width: min(1120px, calc(100% - 32px))')
     expect(css).toContain('min-height: 44px')
     expect(css).toContain(':focus-visible')
+    expect(css).toContain('::selection')
+    expect(css).toContain(':-webkit-autofill')
   })
 
   it('keeps static assets small and text-only except for the SVG mark', () => {
@@ -108,6 +110,15 @@ describe('public UI assets', () => {
     for (const file of files) {
       expect(statSync(file).size, file).toBeLessThan(50000)
     }
+  })
+
+  it('keeps runtime public assets inside Phase 10B soft budgets', () => {
+    const totalJavaScript = statSync('public/app.js').size + statSync('public/ui-core.js').size
+
+    expect(statSync('public/index.html').size).toBeLessThan(15 * 1024)
+    expect(statSync('public/styles.css').size).toBeLessThan(25 * 1024)
+    expect(totalJavaScript).toBeLessThan(40 * 1024)
+    expect(statSync('public/assets/pagepulse-mark.svg').size).toBeLessThan(5 * 1024)
   })
 
   it('keeps the decorative SVG mark free of accessible-name duplication and scripts', () => {

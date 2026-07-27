@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   requiredArchitectureFiles,
   requiredDiagramFiles,
+  requiredPerformanceFiles,
+  requiredScreenshotFiles,
   validateDocumentationStructure
 } from '../../scripts/check-documentation-links.js'
 
@@ -15,9 +17,16 @@ describe('architecture documentation structure', () => {
     expect(existsSync('docs/architecture')).toBe(true)
     expect(existsSync('docs/diagrams')).toBe(true)
 
-    for (const file of [...requiredArchitectureFiles, ...requiredDiagramFiles]) {
+    expect(existsSync('docs/performance')).toBe(true)
+    expect(existsSync('docs/screenshots')).toBe(true)
+
+    for (const file of [...requiredArchitectureFiles, ...requiredDiagramFiles, ...requiredPerformanceFiles, ...requiredScreenshotFiles]) {
       expect(existsSync(file), file).toBe(true)
-      expect(readText(file).trim().length, file).toBeGreaterThan(0)
+      if (file.endsWith('.png')) {
+        expect(readFileSync(file).length, file).toBeGreaterThan(0)
+      } else {
+        expect(readText(file).trim().length, file).toBeGreaterThan(0)
+      }
     }
   })
 
@@ -35,10 +44,14 @@ describe('architecture documentation structure', () => {
     }
 
     expect(rootReadme).toContain('docs/architecture/README.md')
+    expect(rootReadme).toContain('docs/performance/lighthouse-report.md')
+    for (const file of requiredScreenshotFiles) {
+      expect(rootReadme).toContain(file)
+    }
   })
 
   it('keeps local filesystem paths out of required documentation', () => {
-    for (const file of [...requiredArchitectureFiles, ...requiredDiagramFiles, 'README.md']) {
+    for (const file of [...requiredArchitectureFiles, ...requiredDiagramFiles, ...requiredPerformanceFiles, 'README.md']) {
       const text = readText(file)
 
       expect(text, file).not.toMatch(/[A-Za-z]:\\Users\\/)
@@ -52,8 +65,8 @@ describe('architecture documentation structure', () => {
 
     expect(frontend).toContain('Status: Implemented')
     expect(frontend).toContain('No frontend framework')
-    expect(frontend).toContain('has not been measured')
-    expect(frontend).not.toContain('LCP has been measured')
+    expect(frontend).toContain('Phase 10B measured')
+    expect(frontend).toContain('not production field data')
     expect(deployment).toContain('Status: Planned')
     expect(deployment).toContain('PagePulse is not deployed')
     expect(deployment).not.toContain('deployment exists')
@@ -93,5 +106,32 @@ describe('architecture documentation structure', () => {
     expect(packageJson.scripts.ci).toContain('npm run check:docs')
     expect(workflow).toContain('npm run check:docs')
     expect(validateDocumentationStructure()).toEqual([])
+  })
+
+  it('documents Lighthouse lab conditions and median results without production claims', () => {
+    const report = readText('docs/performance/lighthouse-report.md')
+
+    expect(report).toContain('Lighthouse `13.4.1`')
+    expect(report).toContain('Chrome `150.0.7871.182`')
+    expect(report).toContain('mobile navigation')
+    expect(report).toContain('Median')
+    expect(report).toContain('1.160 s')
+    expect(report).toContain('CLS')
+    expect(report).toContain('not field data')
+    expect(report).not.toContain('production measurement')
+  })
+
+  it('keeps screenshot artifacts stable, relative, and reasonably sized', () => {
+    const rootReadme = readText('README.md')
+    const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47])
+
+    for (const file of requiredScreenshotFiles) {
+      const bytes = readFileSync(file)
+
+      expect(bytes.subarray(0, 4), file).toEqual(pngSignature)
+      expect(bytes.length, file).toBeGreaterThan(1024)
+      expect(bytes.length, file).toBeLessThan(1_500_000)
+      expect(rootReadme).toContain(`](${file})`)
+    }
   })
 })
