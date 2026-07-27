@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Display runtime versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check committed whitespace
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          zero_sha="0000000000000000000000000000000000000000"
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff --check "$PR_BASE_SHA" "$PR_HEAD_SHA"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            if [ "$BEFORE_SHA" = "$zero_sha" ]; then
+              git diff-tree --check --no-commit-id --root -r "$CURRENT_SHA"
+            else
+              git diff --check "$BEFORE_SHA" "$CURRENT_SHA"
+            fi
+          elif git rev-parse "$CURRENT_SHA^" >/dev/null 2>&1; then
+            git diff --check "$CURRENT_SHA^" "$CURRENT_SHA"
+          else
+            git diff-tree --check --no-commit-id --root -r "$CURRENT_SHA"
+          fi
+
+      - name: Verify lint
+        run: npm run lint
+
+      - name: Run test suite with coverage
+        run: npm run coverage
+
+      - name: Verify repository hygiene
+        run: npm run check:hygiene
+
+      - name: Verify dependency tree
+        run: npm ls --depth=0
+
+      - name: Audit high-severity vulnerabilities
+        run: npm audit --audit-level=high
+
+      - name: Check generated working-tree whitespace
+        run: git diff --check
+
+      - name: Ensure dependency manifests are unchanged
+        run: git diff --exit-code -- package.json package-lock.json
+
+      - name: Ensure tracked files are unchanged
+        run: |
+          if [ -n "$(git status --short)" ]; then
+            git status --short
+            exit 1
+          fi
