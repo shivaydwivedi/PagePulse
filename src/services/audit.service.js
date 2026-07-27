@@ -6,9 +6,11 @@ export async function prepareAuditRequest(body, options = {}) {
   const normalisedUrl = normalizeAuditUrl(validatedBody.url)
   const transportResult = await options.auditHttpClient.fetchAuditTarget(normalisedUrl)
   const analysisResult = options.htmlAnalysisService.analyse(transportResult)
+  const scoringResult = options.auditScorer.score(analysisResult.checks)
 
   return {
     transportResult,
-    analysisResult
+    analysisResult,
+    scoringResult
   }
 }

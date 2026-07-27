@@ -69,7 +69,16 @@ describe('POST /api/v1/audits', () => {
         contentType: 'text/html',
         responseSizeBytes: 12,
         auditedAt: '2026-07-27T00:00:00.000Z',
-        auditStatus: 'analysis_complete',
+        auditStatus: 'complete',
+        score: 91,
+        grade: 'A',
+        scoring: {
+          scoringPolicyVersion: '1.0',
+          earnedPoints: 84,
+          possiblePoints: 92,
+          excludedPoints: 8,
+          breakdown: expect.any(Object)
+        },
         page: {
           title: 'Example Domain Page',
           metaDescription: 'This is a useful page summary written for deterministic route tests.',
@@ -86,8 +95,18 @@ describe('POST /api/v1/audits', () => {
     expect(JSON.stringify(response.body)).not.toContain('<h1>Example Domain</h1>')
     expect(JSON.stringify(response.body)).not.toContain('session=secret')
     expect(JSON.stringify(response.body)).not.toContain('raw-upstream-value')
-    expect(response.body.data.score).toBeUndefined()
-    expect(response.body.data.grade).toBeUndefined()
+    expect(Object.keys(response.body.data.scoring.breakdown)).toEqual([
+      'https',
+      'title',
+      'metaDescription',
+      'canonical',
+      'viewport',
+      'htmlLang',
+      'headings',
+      'images',
+      'links',
+      'securityHeaders'
+    ])
     expect(response.headers['set-cookie']).toBeUndefined()
   })
 

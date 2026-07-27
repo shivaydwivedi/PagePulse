@@ -9,6 +9,7 @@ import { healthRouter } from './routes/health.routes.js'
 import { createAuditHttpClient } from './infrastructure/http/audit-http-client.js'
 import { createDestinationSafetyService } from './services/destination-safety.service.js'
 import { createHtmlAnalysisService } from './services/html-analysis.service.js'
+import { auditScorer } from './scoring/audit-scorer.js'
 
 export function createApp(options = {}) {
   const config = options.config ?? parseEnv()
@@ -26,6 +27,7 @@ export function createApp(options = {}) {
     clock: options.clock
   })
   app.locals.htmlAnalysisService = options.htmlAnalysisService ?? createHtmlAnalysisService()
+  app.locals.auditScorer = options.auditScorer ?? auditScorer
 
   app.disable('x-powered-by')
   app.use(requestIdMiddleware)
