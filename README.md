@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 5 adds deterministic HTML analysis on top of the safe outbound HTTP transport layer. The API now validates and normalises audit URLs, performs destination-safety checks, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, and returns transport metadata plus page signals, checks, and issues.
+Phase 6 adds deterministic scoring, weighting, and grading on top of the safe outbound HTTP transport and HTML analysis layers. The API now validates and normalises audit URLs, performs destination-safety checks, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, and issues, and calculates a transparent project-specific PagePulse score.
 
-Final scoring, grades, caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
+Caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
 
 ## Technology Stack
 
@@ -97,7 +97,7 @@ Every response includes an `X-Request-ID` header.
 
 ### `POST /api/v1/audits`
 
-Validates, normalises, safety-checks, fetches an audit target URL, and extracts deterministic HTML audit signals. In Phase 5, this endpoint returns transport metadata, page metadata, checks, and issues. It does not calculate a final score or grade.
+Validates, normalises, safety-checks, fetches an audit target URL, extracts deterministic HTML audit signals, and calculates a transparent PagePulse score. In Phase 6, this endpoint returns transport metadata, score, grade, scoring breakdown, page metadata, checks, and issues.
 
 Request body:
 
@@ -148,7 +148,77 @@ Successful analysis response:
     "contentType": "text/html; charset=UTF-8",
     "responseSizeBytes": 1256,
     "auditedAt": "2026-07-27T00:00:00.000Z",
-    "auditStatus": "analysis_complete",
+    "auditStatus": "complete",
+    "score": 86,
+    "grade": "B",
+    "scoring": {
+      "scoringPolicyVersion": "1.0",
+      "earnedPoints": 79,
+      "possiblePoints": 92,
+      "excludedPoints": 8,
+      "breakdown": {
+        "https": {
+          "status": "pass",
+          "weight": 10,
+          "applicable": true,
+          "earnedPoints": 10
+        },
+        "title": {
+          "status": "pass",
+          "weight": 12,
+          "applicable": true,
+          "earnedPoints": 12
+        },
+        "metaDescription": {
+          "status": "warning",
+          "weight": 10,
+          "applicable": true,
+          "earnedPoints": 5
+        },
+        "canonical": {
+          "status": "warning",
+          "weight": 8,
+          "applicable": true,
+          "earnedPoints": 4
+        },
+        "viewport": {
+          "status": "pass",
+          "weight": 8,
+          "applicable": true,
+          "earnedPoints": 8
+        },
+        "htmlLang": {
+          "status": "pass",
+          "weight": 8,
+          "applicable": true,
+          "earnedPoints": 8
+        },
+        "headings": {
+          "status": "pass",
+          "weight": 12,
+          "applicable": true,
+          "earnedPoints": 12
+        },
+        "images": {
+          "status": "not_applicable",
+          "weight": 8,
+          "applicable": false,
+          "earnedPoints": 0
+        },
+        "links": {
+          "status": "pass",
+          "weight": 8,
+          "applicable": true,
+          "earnedPoints": 8
+        },
+        "securityHeaders": {
+          "status": "warning",
+          "weight": 16,
+          "applicable": true,
+          "earnedPoints": 8
+        }
+      }
+    },
     "page": {
       "title": "Example Domain",
       "metaDescription": null,
@@ -427,7 +497,110 @@ Issue-code catalogue:
 | `MISSING_REFERRER_POLICY` | warning | security |
 | `MISSING_PERMISSIONS_POLICY` | warning | security |
 
-No final score, grade, weighted totals, or separate recommendation list is returned in Phase 5. These deterministic checks may feed a later scoring policy.
+Phase 5 extraction rules remain unchanged in Phase 6. No separate recommendation list is returned; issue suggestions remain inside the `issues` array.
+
+## Scoring
+
+PagePulse score is a transparent project-specific audit score. It is not a Google, Lighthouse, Core Web Vitals, industry-standard SEO, or universal website-quality score.
+
+```mermaid
+flowchart TD
+    Checks["Deterministic Phase 5 checks"] --> Policy["Scoring policy v1.0"]
+    Policy --> Breakdown["Weighted breakdown"]
+    Breakdown --> Normalize["Normalise applicable points to 100"]
+    Normalize --> Grade["Assign letter grade"]
+    Grade --> Response["Return score, grade, and scoring details"]
+```
+
+Scoring architecture:
+
+- `src/scoring/scoring-policy.js` stores the immutable policy version, check order, weights, status multipliers, and grade boundaries.
+- `src/scoring/audit-scorer.js` validates the generated check structure and calculates scoring output.
+- The audit service coordinates transport, HTML analysis, and scoring.
+- The controller exposes the calculated score and does not contain scoring weights or calculations.
+
+Scoring policy version: `1.0`. Future scoring-policy changes should increment this version so scores remain comparable.
+
+The scorer expects exactly the ten approved own check keys. Unknown own keys, including non-enumerable string keys and symbol keys, fail internally instead of being silently ignored. Inherited properties do not count as checks. The exported grade helper accepts only integer scores from `0` through `100`; invalid direct inputs fail through the internal error path.
+
+Weight table:
+
+| Check | Weight |
+| --- | ---: |
+| `https` | 10 |
+| `title` | 12 |
+| `metaDescription` | 10 |
+| `canonical` | 8 |
+| `viewport` | 8 |
+| `htmlLang` | 8 |
+| `headings` | 12 |
+| `images` | 8 |
+| `links` | 8 |
+| `securityHeaders` | 16 |
+| Total | 100 |
+
+Status multipliers:
+
+| Status | Multiplier |
+| --- | ---: |
+| `pass` | 1 |
+| `warning` | 0.5 |
+| `fail` | 0 |
+| `not_applicable` | excluded |
+
+Normalisation formula:
+
+```text
+rawRatio = earnedPoints / possiblePoints
+score = round(rawRatio * 100)
+```
+
+`not_applicable` checks are excluded from both earned and possible points. Their weight is reported as `excludedPoints`; `possiblePoints + excludedPoints` remains `100`. If the scorer ever receives all checks as `not_applicable`, it fails internally instead of returning a misleading score.
+
+Grade table:
+
+| Score | Grade |
+| --- | --- |
+| 90-100 | A |
+| 80-89 | B |
+| 70-79 | C |
+| 60-69 | D |
+| 0-59 | F |
+
+Breakdown entry contract:
+
+```json
+{
+  "status": "pass",
+  "weight": 10,
+  "applicable": true,
+  "earnedPoints": 10
+}
+```
+
+The scoring breakdown always contains all ten checks in the same deterministic order as `checks`.
+
+Important scoring rules:
+
+- Score is calculated only from the ten top-level check statuses.
+- Issue order, duplicate issues, issue text, issue suggestions, check summaries, check details, and page metadata do not directly affect score.
+- `UPSTREAM_HTTP_STATUS` does not directly reduce score because it is an issue, not a top-level scoring check.
+- `securityHeaders` is scored through its grouped top-level status. Individual security-header subchecks are not separately weighted in Phase 6.
+- The scoring policy is immutable at runtime and does not read environment variables, current time, request IDs, network state, or random values.
+
+Worked examples:
+
+| Scenario | Raw points | Possible points | Excluded points | Score | Grade |
+| --- | ---: | ---: | ---: | ---: | --- |
+| All applicable checks pass | 100 | 100 | 0 | 100 | A |
+| Images not applicable, everything else passes | 92 | 92 | 8 | 100 | A |
+| Title fails, everything else passes | 88 | 100 | 0 | 88 | B |
+| Title, description, and canonical warn | 85 | 100 | 0 | 85 | B |
+| Score boundary | 90 | 100 | 0 | 90 | A |
+| Score boundary | 89 | 100 | 0 | 89 | B |
+| Score boundary | 79 | 100 | 0 | 79 | C |
+| Score boundary | 69 | 100 | 0 | 69 | D |
+| Score boundary | 59 | 100 | 0 | 59 | F |
 
 ## Destination Safety And SSRF Model
 
@@ -534,7 +707,7 @@ Example DNS failure response:
 
 Current security limitations:
 
-- PagePulse now performs outbound HTTP transport and deterministic HTML analysis, but it still does not produce audit scores.
+- PagePulse now performs outbound HTTP transport, deterministic HTML analysis, and project-specific scoring.
 - DNS rebinding risk is reduced by per-step approved-address dispatching, but not eliminated by application-level checks alone.
 - Real certificate and SNI behaviour relies on Undici's TLS stack and preserving the original hostname as `servername`; full production certificate-path validation may still require deployment-level validation against the eventual hosting environment.
 - Deployment proxies, custom infrastructure, or future distributed architecture may require network-level egress rules.

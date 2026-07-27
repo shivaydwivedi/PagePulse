@@ -68,7 +68,7 @@ function createTestApp(transportResultOrError) {
 }
 
 describe('POST /api/v1/audits analysis response', () => {
-  it('returns page metadata, checks, issues, request IDs, and no raw HTML or score', async () => {
+  it('returns page metadata, checks, issues, score, grade, request IDs, and no raw HTML', async () => {
     const response = await request(createTestApp())
       .post('/api/v1/audits')
       .set('X-Request-ID', 'analysis-request-id')
@@ -81,7 +81,16 @@ describe('POST /api/v1/audits analysis response', () => {
       requestedUrl: 'https://example.com/',
       finalUrl: 'https://example.com/',
       httpStatus: 200,
-      auditStatus: 'analysis_complete',
+      auditStatus: 'complete',
+      score: 100,
+      grade: 'A',
+      scoring: {
+        scoringPolicyVersion: '1.0',
+        earnedPoints: 100,
+        possiblePoints: 100,
+        excludedPoints: 0,
+        breakdown: expect.any(Object)
+      },
       page: {
         title: 'Healthy Example Page',
         headingCount: 1,
@@ -105,8 +114,9 @@ describe('POST /api/v1/audits analysis response', () => {
     ])
     expect(JSON.stringify(response.body)).not.toContain('<h1>')
     expect(JSON.stringify(response.body)).not.toContain('session=secret')
-    expect(response.body.data.score).toBeUndefined()
-    expect(response.body.data.grade).toBeUndefined()
+    expect(Number.isInteger(response.body.data.score)).toBe(true)
+    expect(['A', 'B', 'C', 'D', 'F']).toContain(response.body.data.grade)
+    expect(response.body.data.recommendations).toBeUndefined()
   })
 
   it('returns deterministic issues for malformed HTML, missing title, missing H1, missing alt, missing security headers, and upstream status', async () => {
@@ -120,7 +130,9 @@ describe('POST /api/v1/audits analysis response', () => {
       .expect(200)
 
     expect(response.body.data.httpStatus).toBe(404)
-    expect(response.body.data.auditStatus).toBe('analysis_complete')
+    expect(response.body.data.auditStatus).toBe('complete')
+    expect(response.body.data.score).toBe(49)
+    expect(response.body.data.grade).toBe('F')
     expect(response.body.data.issues.map((item) => item.code)).toEqual([
       'UPSTREAM_HTTP_STATUS',
       'MISSING_TITLE',
@@ -138,6 +150,67 @@ describe('POST /api/v1/audits analysis response', () => {
       'MISSING_REFERRER_POLICY',
       'MISSING_PERMISSIONS_POLICY'
     ])
+  })
+
+  it('scores no-image normalisation, title failure, and upstream status issue independence', async () => {
+    const noImage = await request(createTestApp(createTransportResult({
+      html: `
+        <html lang="en">
+          <head>
+            <title>Healthy Example Page</title>
+            <meta name="description" content="This is a useful page summary written for deterministic integration tests.">
+            <link rel="canonical" href="https://example.com/">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body><h1>Healthy Example</h1><a href="/about">About</a></body>
+        </html>
+      `
+    })))
+      .post('/api/v1/audits')
+      .send({ url: 'https://example.com' })
+      .expect(200)
+
+    expect(noImage.body.data.score).toBe(100)
+    expect(noImage.body.data.grade).toBe('A')
+    expect(noImage.body.data.scoring).toMatchObject({
+      earnedPoints: 92,
+      possiblePoints: 92,
+      excludedPoints: 8
+    })
+    expect(noImage.body.data.scoring.breakdown.images).toMatchObject({
+      status: 'not_applicable',
+      applicable: false,
+      earnedPoints: 0
+    })
+
+    const titleFailure = await request(createTestApp(createTransportResult({
+      html: `
+        <html lang="en">
+          <head>
+            <title> </title>
+            <meta name="description" content="This is a useful page summary written for deterministic integration tests.">
+            <link rel="canonical" href="https://example.com/">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body><h1>Healthy Example</h1><img src="/logo.png" alt="Logo"><a href="/about">About</a></body>
+        </html>
+      `
+    })))
+      .post('/api/v1/audits')
+      .send({ url: 'https://example.com' })
+      .expect(200)
+
+    expect(titleFailure.body.data.score).toBe(88)
+    expect(titleFailure.body.data.grade).toBe('B')
+    expect(titleFailure.body.data.issues.map((item) => item.code)).toContain('MISSING_TITLE')
+
+    const upstream404 = await request(createTestApp(createTransportResult({ statusCode: 404 })))
+      .post('/api/v1/audits')
+      .send({ url: 'https://example.com' })
+      .expect(200)
+
+    expect(upstream404.body.data.score).toBe(100)
+    expect(upstream404.body.data.issues.map((item) => item.code)).toContain('UPSTREAM_HTTP_STATUS')
   })
 
   it('preserves existing transport error responses', async () => {
@@ -233,6 +306,44 @@ describe('POST /api/v1/audits analysis response', () => {
     expect(JSON.stringify(response.body)).not.toContain('transport body secret')
     expect(JSON.stringify(response.body)).not.toContain('<h1>')
     expect(AppError.from(analyserError).cause).toBe(analyserError)
+  })
+
+  it('handles unexpected scorer failures through central error middleware', async () => {
+    const scorerError = new Error('raw scorer weights exploded with <h1>secret html</h1>')
+    const app = createApp({
+      config: testConfig,
+      auditHttpClient: {
+        async fetchAuditTarget() {
+          return createTransportResult({
+            html: '<html><body><h1>transport body secret</h1></body></html>'
+          })
+        }
+      },
+      auditScorer: {
+        score() {
+          throw scorerError
+        }
+      }
+    })
+
+    const response = await request(app)
+      .post('/api/v1/audits')
+      .set('X-Request-ID', 'scoring-error-id')
+      .send({ url: 'https://example.com' })
+      .expect(500)
+
+    expect(response.headers['x-request-id']).toBe('scoring-error-id')
+    expect(response.body.requestId).toBe('scoring-error-id')
+    expect(response.body.error).toEqual({
+      code: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred.',
+      details: []
+    })
+    expect(JSON.stringify(response.body)).not.toContain('raw scorer weights')
+    expect(JSON.stringify(response.body)).not.toContain('stack')
+    expect(JSON.stringify(response.body)).not.toContain('transport body secret')
+    expect(JSON.stringify(response.body)).not.toContain('<h1>')
+    expect(AppError.from(scorerError).cause).toBe(scorerError)
   })
 
   it('preserves malformed JSON, unsupported media type, health, and unknown route behaviour', async () => {
