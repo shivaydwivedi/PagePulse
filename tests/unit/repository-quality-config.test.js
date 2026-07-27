@@ -8,7 +8,7 @@ function readText(path) {
 
 function extractWorkflowStep(workflow, name) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = workflow.match(new RegExp(`      - name: ${escapedName}\\n([\\s\\S]*?)(?=\\n      - name: |\\n?$)`))
+  const match = workflow.match(new RegExp(`      - name: ${escapedName}\\r?\\n([\\s\\S]*?)(?=\\r?\\n      - name: |\\r?\\n?$)`))
 
   return match?.[1] ?? ''
 }
@@ -103,7 +103,8 @@ describe('repository quality configuration', () => {
     const packageJson = JSON.parse(readText('package.json'))
 
     expect(packageJson.scripts['check:hygiene']).toBe('node scripts/check-repository-hygiene.js')
-    expect(packageJson.scripts.ci).toBe('npm run lint && npm run coverage && npm run check:hygiene')
+    expect(packageJson.scripts['check:docs']).toBe('node scripts/check-documentation-links.js')
+    expect(packageJson.scripts.ci).toBe('npm run lint && npm run coverage && npm run check:docs && npm run check:hygiene')
     expect(packageJson.scripts.check).toBe('npm run lint && npm test')
     expect(Object.values(packageJson.scripts).join('\n')).not.toContain('npm audit fix')
     expect(Object.values(packageJson.scripts).join('\n')).not.toContain('audit fix --force')

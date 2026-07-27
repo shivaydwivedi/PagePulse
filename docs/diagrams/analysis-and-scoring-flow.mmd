@@ -1,0 +1,12 @@
+flowchart TD
+  BoundedHTML[Bounded HTML buffer] --> Cheerio[Cheerio parser]
+  Cheerio --> Metadata[Metadata extraction]
+  Cheerio --> Analyzers[Ten analyzers in stable order]
+  Metadata --> Checks[Checks]
+  Analyzers --> Checks
+  Checks --> Issues[Deterministic issues]
+  Checks --> Policy[Scoring policy version 1]
+  Policy --> Score[Score and grade]
+  Score --> Breakdown[Scoring breakdown]
+  Issues --> AuditPayload[Audit payload]
+  Breakdown --> AuditPayload

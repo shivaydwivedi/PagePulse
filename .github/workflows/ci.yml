@@ -75,6 +75,9 @@ jobs:
       - name: Run test suite with coverage
         run: npm run coverage
 
+      - name: Verify documentation structure
+        run: npm run check:docs
+
       - name: Verify repository hygiene
         run: npm run check:hygiene
 

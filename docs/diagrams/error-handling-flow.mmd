@@ -1,0 +1,6 @@
+flowchart TD
+  ErrorSource[Error source] --> AppError[AppError mapping]
+  AppError --> Sanitise[Sanitise public details]
+  Sanitise --> RequestID[Attach request ID]
+  RequestID --> Log[Structured error log]
+  RequestID --> Response[Safe public response]

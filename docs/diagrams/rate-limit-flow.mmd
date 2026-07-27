@@ -1,0 +1,11 @@
+flowchart TD
+  Request[Audit request] --> ClientIP[Express req.ip]
+  ClientIP --> Normalize[Normalize client IP]
+  Normalize --> Consume[Consume fixed window bucket]
+  Consume -->|Allowed| Headers[Set RateLimit headers]
+  Headers --> Parser[Body parser after allowance]
+  Consume -->|Rejected| Reject[429 with Retry After]
+  Consume -->|Invalid decision| Unavailable[503 limiter unavailable]
+  Consume -->|Limiter error| Unavailable
+  Reject --> Stop[Stop before cache and semaphore]
+  Unavailable --> Stop

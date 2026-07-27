@@ -1,0 +1,10 @@
+flowchart TD
+  NormalizedURL[Normalized URL] --> CacheOne[First cache lookup]
+  CacheOne -->|HIT| Hit[Return HIT]
+  CacheOne -->|MISS| Permit[Acquire semaphore permit]
+  Permit -->|Queue full or timeout| Capacity[Capacity error]
+  Permit -->|Acquired| CacheTwo[Second cache lookup]
+  CacheTwo -->|HIT| ReleaseHit[Release permit and return HIT]
+  CacheTwo -->|MISS| Audit[Run transport analysis scoring]
+  Audit --> CacheSet[Store public payload]
+  CacheSet --> ReleaseMiss[Release permit and return MISS]
