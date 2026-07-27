@@ -53,16 +53,32 @@ function isSafePrimitive(value) {
     ['string', 'number', 'boolean'].includes(typeof value)
 }
 
+function isNullableString(value) {
+  return value === null || typeof value === 'string'
+}
+
+function isSafeDetailValue(value) {
+  if (isSafePrimitive(value)) {
+    return true
+  }
+
+  if (Array.isArray(value)) {
+    return value.every(isSafePrimitive)
+  }
+
+  if (isPlainObject(value)) {
+    return Object.values(value).every((item) => (
+      isSafePrimitive(item) || (Array.isArray(item) && item.every(isSafePrimitive))
+    ))
+  }
+
+  return false
+}
+
 function isValidDetails(value) {
   if (value === undefined) return true
   if (!isPlainObject(value)) return false
-  return Object.values(value).every((item) => {
-    if (Array.isArray(item)) {
-      return item.every(isSafePrimitive)
-    }
-
-    return isSafePrimitive(item)
-  })
+  return Object.values(value).every(isSafeDetailValue)
 }
 
 function isValidCheck(value) {
@@ -102,6 +118,17 @@ function isValidIssue(value) {
     (value.suggestion === undefined || isNonEmptyString(value.suggestion))
 }
 
+function isValidPage(value) {
+  return isPlainObject(value) &&
+    isNullableString(value.title) &&
+    isNullableString(value.metaDescription) &&
+    isNullableString(value.canonicalUrl) &&
+    isNullableString(value.language) &&
+    isNonNegativeInteger(value.headingCount) &&
+    isNonNegativeInteger(value.imageCount) &&
+    isNonNegativeInteger(value.linkCount)
+}
+
 function isValidAuditData(data) {
   if (!isPlainObject(data) ||
     !isFiniteNumberInRange(data.score, 0, 100) ||
@@ -117,6 +144,7 @@ function isValidAuditData(data) {
     !isNonEmptyString(data.contentType) ||
     !isNonNegativeInteger(data.responseSizeBytes) ||
     !isPlainObject(data.checks) ||
+    !isValidPage(data.page) ||
     !Array.isArray(data.issues) ||
     !isValidScoring(data.scoring)) {
     return false

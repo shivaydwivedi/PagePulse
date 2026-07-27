@@ -208,6 +208,10 @@ function formatBytes(value) {
   return `${(value / 1024 / 1024).toFixed(2)} MB`
 }
 
+function formatNullableText(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value : 'Not provided'
+}
+
 function getStatusText(status) {
   return {
     pass: 'Pass',
@@ -377,6 +381,13 @@ function renderTechnicalMetadata(data, requestId, headers) {
   clearNode(elements.technicalMetadata)
   addMetadata(elements.technicalMetadata, 'Requested URL', data.requestedUrl, data.requestedUrl)
   addMetadata(elements.technicalMetadata, 'Final URL', data.finalUrl, data.finalUrl)
+  addMetadata(elements.technicalMetadata, 'Page title', formatNullableText(data.page?.title), data.page?.title)
+  addMetadata(elements.technicalMetadata, 'Meta description', formatNullableText(data.page?.metaDescription), data.page?.metaDescription)
+  addMetadata(elements.technicalMetadata, 'Canonical URL', formatNullableText(data.page?.canonicalUrl), data.page?.canonicalUrl)
+  addMetadata(elements.technicalMetadata, 'Language', formatNullableText(data.page?.language))
+  addMetadata(elements.technicalMetadata, 'Headings', String(data.page?.headingCount ?? 'Not reported'))
+  addMetadata(elements.technicalMetadata, 'Images', String(data.page?.imageCount ?? 'Not reported'))
+  addMetadata(elements.technicalMetadata, 'Links', String(data.page?.linkCount ?? 'Not reported'))
   addMetadata(elements.technicalMetadata, 'HTTP status', String(data.httpStatus ?? 'Not reported'))
   addMetadata(elements.technicalMetadata, 'Redirect count', String(data.redirectCount ?? 'Not reported'))
   addMetadata(elements.technicalMetadata, 'Response size', formatBytes(data.responseSizeBytes))
