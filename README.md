@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 4 establishes the safe outbound HTTP transport layer. The API now validates and normalises audit URLs, performs destination-safety checks, connects through an approved-address dispatcher, follows safe redirects manually, enforces timeouts and response-size limits, accepts only HTML content types, and returns transport metadata.
+Phase 5 adds deterministic HTML analysis on top of the safe outbound HTTP transport layer. The API now validates and normalises audit URLs, performs destination-safety checks, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, and returns transport metadata plus page signals, checks, and issues.
 
-HTML parsing, SEO checks, scoring, caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
+Final scoring, grades, caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are not implemented yet.
 
 ## Technology Stack
 
@@ -15,7 +15,8 @@ HTML parsing, SEO checks, scoring, caching, concurrency limits, rate limiting, C
 - JavaScript ES modules
 - Zod
 - Pino and pino-http
-- Undici, installed for later audit HTTP work
+- Undici
+- Cheerio
 - Vitest
 - Supertest
 - ESLint
@@ -96,7 +97,7 @@ Every response includes an `X-Request-ID` header.
 
 ### `POST /api/v1/audits`
 
-Validates, normalises, safety-checks, and fetches an audit target URL. In Phase 4, this endpoint returns transport metadata only. It does not parse HTML, run SEO checks, or calculate a score.
+Validates, normalises, safety-checks, fetches an audit target URL, and extracts deterministic HTML audit signals. In Phase 5, this endpoint returns transport metadata, page metadata, checks, and issues. It does not calculate a final score or grade.
 
 Request body:
 
@@ -132,7 +133,7 @@ URL normalisation rules currently implemented:
 
 Important security boundary: Phase 4 performs destination checks before the initial connection and before every redirect. It also uses a per-request approved-address dispatcher so the connection path receives only the addresses approved for that specific URL step. This materially reduces DNS rebinding risk, but it is not a claim of complete SSRF prevention. See the security model below for current guarantees and limitations.
 
-Successful transport response:
+Successful analysis response:
 
 ```json
 {
@@ -147,12 +148,100 @@ Successful transport response:
     "contentType": "text/html; charset=UTF-8",
     "responseSizeBytes": 1256,
     "auditedAt": "2026-07-27T00:00:00.000Z",
-    "auditStatus": "transport_complete"
+    "auditStatus": "analysis_complete",
+    "page": {
+      "title": "Example Domain",
+      "metaDescription": null,
+      "canonicalUrl": null,
+      "language": "en",
+      "headingCount": 1,
+      "imageCount": 0,
+      "linkCount": 1
+    },
+    "checks": {
+      "https": {
+        "status": "pass",
+        "summary": "The final URL uses HTTPS.",
+        "details": {
+          "finalProtocol": "https:"
+        }
+      },
+      "title": {
+        "status": "pass",
+        "summary": "The document title is present and within the preferred range.",
+        "details": {
+          "length": 14
+        }
+      },
+      "metaDescription": {
+        "status": "warning",
+        "summary": "The page does not define a meta description.",
+        "details": {
+          "length": 0
+        }
+      },
+      "canonical": {
+        "status": "warning",
+        "summary": "The page does not define a canonical URL.",
+        "details": {
+          "present": false,
+          "count": 0
+        }
+      },
+      "viewport": {
+        "status": "pass",
+        "summary": "The page defines a viewport meta tag.",
+        "details": {
+          "present": true
+        }
+      },
+      "htmlLang": {
+        "status": "pass",
+        "summary": "The html element defines a plausible language.",
+        "details": {
+          "language": "en"
+        }
+      },
+      "headings": {
+        "status": "pass",
+        "summary": "The page heading structure has one primary H1 and no detected structural warnings.",
+        "details": {
+          "total": 1,
+          "h1Count": 1
+        }
+      },
+      "images": {
+        "status": "not_applicable",
+        "summary": "The page does not include images.",
+        "details": {
+          "total": 0
+        }
+      },
+      "links": {
+        "status": "pass",
+        "summary": "No empty or javascript link href values were detected.",
+        "details": {
+          "totalAnchors": 1,
+          "anchorsWithHref": 1
+        }
+      },
+      "securityHeaders": {
+        "status": "warning",
+        "summary": "2 of 6 recommended security headers are present or applicable.",
+        "details": {
+          "contentSecurityPolicy": {
+            "status": "warning",
+            "present": false
+          }
+        }
+      }
+    },
+    "issues": []
   }
 }
 ```
 
-The PagePulse API returns HTTP `200` when transport completes and the upstream response is supported HTML, even if the upstream website returns a status such as `404` or `500`. The upstream status is reported as `httpStatus`. The full HTML body is retained internally for the next phase and is not returned publicly.
+The PagePulse API returns HTTP `200` when transport and analysis complete, even if the upstream website returns a status such as `404` or `500`. The upstream status is reported as `httpStatus`, and non-2xx statuses add a deterministic `UPSTREAM_HTTP_STATUS` issue. The bounded HTML body is analysed internally and is not returned publicly.
 
 Example Bash request:
 
@@ -213,8 +302,132 @@ Current public error codes:
 | `RESPONSE_TOO_LARGE` | 502 | Destination response exceeded the allowed size |
 | `UPSTREAM_UNSUPPORTED_CONTENT` | 422 | Destination did not return supported HTML content |
 | `UPSTREAM_REQUEST_FAILED` | 502 | Controlled fallback for other upstream transport failures |
+| `HTML_ANALYSIS_FAILED` | 422 | Upstream HTML could not be parsed for analysis |
 | `NOT_FOUND` | 404 | Route was not found |
 | `INTERNAL_ERROR` | 500 | Unexpected application error |
+
+## HTML Analysis
+
+Phase 5 analyses only the bounded HTML body already returned by the safe HTTP client. It does not fetch links, images, scripts, stylesheets, favicons, canonical URLs, robots.txt, or any other page resource.
+
+```mermaid
+flowchart TD
+    Request["Audit request"] --> Normalize["Validate and normalise URL"]
+    Normalize --> Transport["Safe HTTP transport"]
+    Transport --> Parse["Parse bounded HTML with Cheerio"]
+    Parse --> Metadata["Extract page metadata"]
+    Metadata --> Checks["Run deterministic checks"]
+    Checks --> Issues["Create ordered issues"]
+    Issues --> Response["Return analysis response"]
+```
+
+Architecture boundaries:
+
+- The HTTP client fetches the bounded body and transport metadata only.
+- The HTML analysis service receives `finalUrl`, retained response headers, `contentType`, and `body`, then coordinates analyzers.
+- Analyzer modules perform deterministic parsing and checks without Express logic, network logic, global mutation, or resource fetching.
+- The audit service coordinates transport plus analysis.
+- The controller shapes the public response and does not extract HTML signals.
+
+Cheerio parsing boundary:
+
+- Scripts are not executed.
+- Remote resources are not loaded.
+- Malformed-but-parseable HTML is still analysed.
+- UTF-8 decoding is supported; invalid UTF-8 uses replacement characters rather than crashing.
+- Charset parameters are recorded internally for analysis context, but full non-UTF-8 transcoding is limited in this phase because no dedicated encoding dependency was added.
+- Public text limits are measured in Unicode code points after whitespace normalisation. Truncation does not split surrogate pairs, and malformed lone surrogates are replaced before output.
+- Raw HTML, script contents, unbounded page text, raw upstream headers, and cookies are not exposed publicly.
+- Unexpected analyser bugs return `INTERNAL_ERROR` through the central error middleware without exposing raw HTML, parser messages, analyser messages, or stack traces.
+
+Page metadata contract:
+
+```json
+{
+  "title": "Example Domain",
+  "metaDescription": null,
+  "canonicalUrl": "https://example.com/",
+  "language": "en",
+  "headingCount": 1,
+  "imageCount": 0,
+  "linkCount": 1
+}
+```
+
+Check result contract:
+
+```json
+{
+  "status": "pass",
+  "summary": "Human-readable result.",
+  "details": {}
+}
+```
+
+Statuses are stable: `pass`, `warning`, `fail`, and `not_applicable`. Checks are returned in this order: `https`, `title`, `metaDescription`, `canonical`, `viewport`, `htmlLang`, `headings`, `images`, `links`, `securityHeaders`.
+
+Issue contract:
+
+```json
+{
+  "code": "MISSING_TITLE",
+  "severity": "error",
+  "category": "seo",
+  "message": "The page does not define a document title.",
+  "suggestion": "Add a concise and descriptive <title> element."
+}
+```
+
+Warnings and failures create one deterministic issue per condition. Passing checks do not create issues. Issue codes are unique and ordered by upstream status first, then the check order above.
+
+Implemented check catalogue:
+
+- `https`: warns when the final URL is HTTP. This does not judge TLS strength or certificate quality.
+- `title`: missing/empty fails; 1-9 chars warns; 10-60 passes; over 60 warns. Exposed title text is whitespace-normalised and bounded.
+- `metaDescription`: missing/empty warns; 1-49 warns; 50-160 passes; over 160 warns. Open Graph descriptions are not substitutes in this phase.
+- `canonical`: missing, empty, malformed, unsupported protocol, embedded credentials, overlong public URL exposure, or multiple canonical tags warn. Relative canonicals resolve against the final URL but are never fetched. Canonical URLs longer than the public 500-code-point bound are validated but returned as `null` instead of exposing a truncated URL.
+- `viewport`: missing or empty viewport meta warns; meaningful content passes.
+- `htmlLang`: missing, empty, or clearly malformed `html[lang]` warns. Conservative tags such as `en`, `en-US`, `hi-IN`, `zh-Hant`, and `pt-BR` pass.
+- `headings`: missing non-empty H1, multiple non-empty H1s, empty headings, and skipped heading levels warn. Full heading text is not exposed.
+- `images`: no images returns `not_applicable`; missing `alt` warns; empty `alt=""` is accepted as potentially decorative.
+- `links`: empty/whitespace href and `javascript:` href warn. Missing href, fragments, `mailto:`, `tel:`, HTTP/HTTPS links, and unsupported protocols are counted but not fetched.
+- `securityHeaders`: checks the retained safe header subset for CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy. Header checks are intentionally basic and do not claim semantic security merely because a header is present.
+
+Issue-code catalogue:
+
+| Code | Severity | Category |
+| --- | --- | --- |
+| `UPSTREAM_HTTP_STATUS` | warning | content |
+| `INSECURE_HTTP` | warning | security |
+| `MISSING_TITLE` | error | seo |
+| `TITLE_TOO_SHORT` | warning | seo |
+| `TITLE_TOO_LONG` | warning | seo |
+| `MISSING_META_DESCRIPTION` | warning | seo |
+| `META_DESCRIPTION_TOO_SHORT` | warning | seo |
+| `META_DESCRIPTION_TOO_LONG` | warning | seo |
+| `MISSING_CANONICAL` | warning | seo |
+| `EMPTY_CANONICAL` | warning | seo |
+| `INVALID_CANONICAL` | warning | seo |
+| `MULTIPLE_CANONICAL_TAGS` | warning | seo |
+| `CANONICAL_URL_TOO_LONG` | warning | seo |
+| `MISSING_VIEWPORT` | warning | accessibility |
+| `MISSING_HTML_LANG` | warning | accessibility |
+| `INVALID_HTML_LANG` | warning | accessibility |
+| `MISSING_H1` | warning | content |
+| `MULTIPLE_H1` | warning | content |
+| `EMPTY_HEADING` | warning | content |
+| `SKIPPED_HEADING_LEVEL` | warning | content |
+| `IMAGE_MISSING_ALT` | warning | accessibility |
+| `EMPTY_LINK_HREF` | warning | content |
+| `JAVASCRIPT_LINK` | warning | content |
+| `MISSING_CONTENT_SECURITY_POLICY` | warning | security |
+| `MISSING_STRICT_TRANSPORT_SECURITY` | warning | security |
+| `INVALID_X_CONTENT_TYPE_OPTIONS` | warning | security |
+| `MISSING_X_FRAME_OPTIONS` | warning | security |
+| `MISSING_REFERRER_POLICY` | warning | security |
+| `MISSING_PERMISSIONS_POLICY` | warning | security |
+
+No final score, grade, weighted totals, or separate recommendation list is returned in Phase 5. These deterministic checks may feed a later scoring policy.
 
 ## Destination Safety And SSRF Model
 
@@ -234,7 +447,8 @@ flowchart TD
     Dispatcher --> Fetch["Fetch with Undici"]
     Fetch --> Redirect{"Recognised redirect?"}
     Redirect -->|Yes| Validate
-    Redirect -->|No| Transport["Return transport metadata"]
+    Redirect -->|No| Analysis["Analyse bounded HTML"]
+    Analysis --> Transport["Return transport metadata and analysis"]
 ```
 
 Current destination-safety behaviour:
@@ -320,7 +534,7 @@ Example DNS failure response:
 
 Current security limitations:
 
-- PagePulse now performs outbound HTTP transport, but it still does not parse HTML or produce audit scores.
+- PagePulse now performs outbound HTTP transport and deterministic HTML analysis, but it still does not produce audit scores.
 - DNS rebinding risk is reduced by per-step approved-address dispatching, but not eliminated by application-level checks alone.
 - Real certificate and SNI behaviour relies on Undici's TLS stack and preserving the original hostname as `servername`; full production certificate-path validation may still require deployment-level validation against the eventual hosting environment.
 - Deployment proxies, custom infrastructure, or future distributed architecture may require network-level egress rules.

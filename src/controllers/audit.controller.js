@@ -2,8 +2,9 @@ import { prepareAuditRequest } from '../services/audit.service.js'
 import { successEnvelope } from '../utils/response-envelope.js'
 
 export async function createAuditController(req, res) {
-  const { transportResult } = await prepareAuditRequest(req.body, {
-    auditHttpClient: req.app.locals.auditHttpClient
+  const { transportResult, analysisResult } = await prepareAuditRequest(req.body, {
+    auditHttpClient: req.app.locals.auditHttpClient,
+    htmlAnalysisService: req.app.locals.htmlAnalysisService
   })
 
   res.status(200).json(successEnvelope({
@@ -17,7 +18,10 @@ export async function createAuditController(req, res) {
       contentType: transportResult.contentType,
       responseSizeBytes: transportResult.responseSizeBytes,
       auditedAt: transportResult.auditedAt,
-      auditStatus: 'transport_complete'
+      auditStatus: 'analysis_complete',
+      page: analysisResult.page,
+      checks: analysisResult.checks,
+      issues: analysisResult.issues
     }
   }))
 }
