@@ -10,7 +10,10 @@ const testConfig = {
 }
 
 function createTestApp() {
-  return createApp({ config: testConfig })
+  return createApp({
+    config: testConfig,
+    resolver: async () => [{ address: '93.184.216.34', family: 4 }]
+  })
 }
 
 describe('POST /api/v1/audits', () => {

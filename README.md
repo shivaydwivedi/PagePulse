@@ -4,9 +4,9 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 2 establishes the public audit request contract, request validation, URL syntax checks, and deterministic URL normalisation. It also includes the Node.js and Express foundation, configuration validation, structured logging setup, request IDs, shared response envelopes, central error handling, a safe health endpoint, and an automated test harness.
+Phase 3 establishes destination-safety validation before any outbound request can be introduced. The API now validates and normalises audit URLs, blocks explicit unsafe hostnames, classifies literal IP addresses, resolves domain names through the operating-system resolver, and rejects any destination that does not resolve exclusively to public unicast addresses.
 
-Remote page fetching and audit generation are not implemented yet. SSRF protection, destination safety checks, caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are also not implemented yet.
+Remote page fetching and audit generation are not implemented yet. Caching, concurrency limits, rate limiting, CI, deployment, and the public demonstration interface are also not implemented yet.
 
 ## Technology Stack
 
@@ -126,7 +126,7 @@ URL normalisation rules currently implemented:
 - Pathname case, query strings, and meaningful trailing slashes are preserved.
 - URL fragments are removed because fragments are not sent in HTTP requests.
 
-Important security boundary: Phase 2 does not perform DNS resolution, private IP checks, localhost blocking, redirect checks, or SSRF protection. A syntactically valid URL is not yet considered safe to fetch. Destination safety checks are planned for the next security phase.
+Important security boundary: Phase 3 performs hostname, DNS, and IP destination checks before the temporary response, but it does not fetch the URL. This layer is not a claim of complete SSRF prevention. See the security model below for current guarantees and limitations.
 
 Temporary Phase 2 response for a valid request:
 
@@ -197,10 +197,103 @@ Current public error codes:
 | `INVALID_URL` | 400 | URL syntax is invalid |
 | `UNSUPPORTED_PROTOCOL` | 400 | URL protocol is not `http:` or `https:` |
 | `URL_CREDENTIALS_BLOCKED` | 400 | URL contains embedded username or password information |
+| `BLOCKED_TARGET` | 400 | URL hostname or resolved destination is not allowed |
+| `DNS_LOOKUP_FAILED` | 502 | Destination hostname could not be resolved |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Request body was supplied with a non-JSON content type |
 | `AUDIT_PROCESSING_NOT_IMPLEMENTED` | 501 | URL validation succeeded, but audit processing is not implemented yet |
 | `NOT_FOUND` | 404 | Route was not found |
 | `INTERNAL_ERROR` | 500 | Unexpected application error |
+
+## Destination Safety And SSRF Model
+
+PagePulse performs destination validation before the future HTTP audit client is allowed to fetch a URL. The goal is to reduce server-side request forgery risk by failing closed unless the audit target is clearly a public destination.
+
+```mermaid
+flowchart TD
+    Request["Audit Request"] --> Validate["Validate and normalise URL"]
+    Validate --> HostCheck["Check blocked hostname forms"]
+    HostCheck --> Literal{"Literal IP?"}
+    Literal -->|Yes| IPCheck["Classify IP address"]
+    Literal -->|No| DNS["Resolve all addresses"]
+    DNS --> IPCheck
+    IPCheck --> Safe{"All addresses public?"}
+    Safe -->|No| Block["Reject target"]
+    Safe -->|Yes| Continue["Continue to temporary 501 boundary"]
+```
+
+Current destination-safety behaviour:
+
+- Blocks explicit hostname forms such as `localhost`, `localhost.`, `*.localhost`, `ip6-localhost`, `ip6-loopback`, `broadcasthost`, and `localhost.localdomain`.
+- Detects literal IPv4 and bracketed IPv6 URL hostnames and classifies them without DNS lookup.
+- Uses Node's promise-based `dns.lookup(hostname, { all: true, verbatim: true })` for domain names so validation follows the operating-system resolver path used by normal connections.
+- Rejects DNS failures and empty DNS results.
+- Rejects mixed DNS answers if any returned address is private, loopback, link-local, multicast, documentation, benchmarking, reserved, unspecified, or otherwise not confidently public.
+- Accepts DNS answers only when every address parses correctly and every resolver `family` value matches the actual address family.
+- Reduces IPv4-mapped IPv6 addresses to their mapped IPv4 address and applies the IPv4 rules.
+- Rejects uncertain or malformed resolver results instead of attempting to continue.
+
+Blocked target categories include:
+
+- localhost-style names
+- loopback addresses
+- private IPv4 ranges
+- unique-local IPv6 ranges
+- link-local addresses
+- carrier-grade NAT/shared address space
+- documentation and benchmarking ranges
+- multicast and reserved ranges
+- unspecified and broadcast addresses
+- IPv4-mapped IPv6 addresses that map to blocked IPv4 destinations
+
+Example blocked-target response:
+
+```json
+{
+  "success": false,
+  "requestId": "current-request-id",
+  "error": {
+    "code": "BLOCKED_TARGET",
+    "message": "The requested URL resolves to a destination that is not allowed.",
+    "details": [
+      {
+        "field": "url",
+        "reason": "blocked_destination",
+        "hostname": "localhost"
+      }
+    ]
+  }
+}
+```
+
+Example DNS failure response:
+
+```json
+{
+  "success": false,
+  "requestId": "current-request-id",
+  "error": {
+    "code": "DNS_LOOKUP_FAILED",
+    "message": "The destination hostname could not be resolved.",
+    "details": [
+      {
+        "field": "url",
+        "hostname": "missing.example"
+      }
+    ]
+  }
+}
+```
+
+Current security limitations:
+
+- PagePulse still does not make outbound HTTP requests; the safety layer currently gates the temporary `501` boundary.
+- DNS rebinding between validation and a future connection is not fully eliminated yet.
+- The future HTTP-client phase must revalidate every redirect target with the same destination-safety service.
+- Controlled socket connection, DNS pinning, and custom Undici dispatcher behaviour are not implemented yet.
+- Cloud metadata hostnames, unusual resolver behaviour, split-horizon DNS, and deployment-network differences may require platform-specific hardening.
+- URL parser canonicalisation can transform unusual numeric host forms before destination validation; uncertain parsed IP forms are rejected where they reach the IP classifier.
+
+Security assumption: an audit target is eligible for future fetching only if every validated address is a clearly public unicast destination at the time of validation. Any uncertainty rejects the request.
 
 ## Public Page Credit
 
