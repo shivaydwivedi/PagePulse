@@ -1,0 +1,13 @@
+flowchart TD
+  APIClient[API Client] --> ExpressAPI[PagePulse Express API]
+  ExpressAPI --> RequestID[Request ID]
+  ExpressAPI --> RateLimiter[Rate Limiter]
+  RateLimiter --> Cache[Cache]
+  Cache --> Semaphore[Semaphore]
+  Semaphore --> DestinationSafety[Destination Safety]
+  DestinationSafety --> SafeTransport[Safe HTTP Transport]
+  SafeTransport --> TargetWebsite[Target Website]
+  SafeTransport --> HTMLAnalysis[HTML Analysis]
+  HTMLAnalysis --> Scoring[Scoring]
+  Scoring --> ExpressAPI
+  ExpressAPI --> APIClient

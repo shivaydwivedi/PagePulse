@@ -1,0 +1,12 @@
+flowchart TD
+  Trigger[Push PR or manual trigger] --> Checkout[Checkout full history]
+  Checkout --> Node[Node 22 setup]
+  Node --> Install[npm ci]
+  Install --> CommittedWhitespace[Committed whitespace check]
+  CommittedWhitespace --> Lint[Lint]
+  Lint --> Coverage[Coverage with thresholds]
+  Coverage --> Docs[Documentation check]
+  Docs --> Hygiene[Repository hygiene]
+  Hygiene --> Tree[Dependency tree]
+  Tree --> Audit[High severity audit]
+  Audit --> Workspace[Working tree checks]

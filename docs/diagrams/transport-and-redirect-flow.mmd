@@ -1,0 +1,20 @@
+flowchart TD
+  Start[Start audit attempt] --> Timer[Create attempt timer]
+  Timer --> Safety[Validate destination]
+  Safety --> Dispatcher[Create approved dispatcher]
+  Dispatcher --> Request[Undici request]
+  Request --> Headers[Retain safe headers]
+  Headers --> RedirectCheck{Redirect status}
+  RedirectCheck -->|Yes| CancelRedirectBody[Cancel body]
+  CancelRedirectBody --> RedirectLimit[Check redirect limit]
+  RedirectLimit --> RedirectLocation[Validate redirect location]
+  RedirectLocation --> Safety
+  RedirectCheck -->|No| ContentType[Enforce HTML content type]
+  ContentType --> ContentLength[Check content length]
+  ContentLength --> BodyStream[Stream bounded body]
+  BodyStream --> Success[Return transport metadata]
+  Request --> Error[Map transport error]
+  BodyStream --> TooLarge[Response too large]
+  Error --> Cleanup[Cleanup dispatcher and timer]
+  TooLarge --> Cleanup
+  Success --> Cleanup

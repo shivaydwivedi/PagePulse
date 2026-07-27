@@ -1,0 +1,13 @@
+flowchart TD
+  InputURL[Input URL] --> Validation[Request validation]
+  Validation --> Normalization[URL normalization]
+  Normalization --> DNS[DNS resolution]
+  DNS --> Classification[Address classification]
+  Classification -->|Private or special| Block[Block target]
+  Classification -->|Public unicast| Approve[Approve addresses]
+  Approve --> Dispatcher[Approved dispatcher]
+  Dispatcher --> Request[Outbound request]
+  Request --> Redirect{Redirect}
+  Redirect -->|Yes| RedirectURL[Resolve redirect URL]
+  RedirectURL --> Validation
+  Redirect -->|No| Success[Return bounded response]

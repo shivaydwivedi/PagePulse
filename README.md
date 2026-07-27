@@ -4,7 +4,7 @@ PagePulse is a production-minded URL health and quality audit API being built fo
 
 ## Current Status
 
-Phase 9 adds local GitHub Actions CI configuration and repository quality gates on top of configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, and HTML analysis. The API rate-limits audit attempts, validates and normalises audit URLs, checks the cache, bounds concurrent cache-miss audits, fetches bounded HTML through the approved-address transport, parses the returned body with Cheerio, returns page signals, checks, issues, and calculates a transparent project-specific PagePulse score.
+Backend phases 1 through 8 are implemented: configurable per-client fixed-window rate limiting, bounded in-memory TTL caching, per-process audit concurrency control, deterministic scoring, safe outbound HTTP transport, HTML analysis, destination safety, validation, structured logging, and the Express API foundation. Phase 9 adds local GitHub Actions CI configuration and repository quality gates. Phase 9B adds architecture documentation and reusable Mermaid diagram sources.
 
 The CI workflow is configured and will run on pushes and pull requests after this branch is merged. Deployment and the public demonstration interface remain pending.
 
@@ -88,7 +88,44 @@ Copy `.env.example` to `.env` for local development values. Do not commit real `
 - `npm run lint`: run ESLint
 - `npm run check`: run lint and tests
 - `npm run check:hygiene`: reject commonly sensitive or generated tracked files
-- `npm run ci`: run the local CI-equivalent lint, coverage, and hygiene checks
+- `npm run check:docs`: verify required architecture documentation and diagram structure
+- `npm run ci`: run the local CI-equivalent lint, coverage, documentation, and hygiene checks
+
+## Architecture Documentation
+
+Detailed architecture notes live in [docs/architecture/README.md](docs/architecture/README.md), with reusable Mermaid sources in [docs/diagrams/README.md](docs/diagrams/README.md).
+
+Key documents:
+
+- [System overview](docs/architecture/system-overview.md)
+- [Request lifecycle](docs/architecture/request-lifecycle.md)
+- [Security architecture](docs/architecture/security-architecture.md)
+- [Analysis and scoring](docs/architecture/analysis-and-scoring.md)
+- [Caching and concurrency](docs/architecture/caching-and-concurrency.md)
+- [Rate limiting](docs/architecture/rate-limiting.md)
+- [CI and quality gates](docs/architecture/ci-and-quality-gates.md)
+- [Architecture decisions](docs/architecture/architecture-decisions.md)
+
+Future frontend and deployment architecture documents are planning documents only; no frontend framework, hosting provider, or deployed environment has been selected.
+
+## Project Structure
+
+```text
+.
+|-- .github/
+|   |-- workflows/
+|   |-- ISSUE_TEMPLATE/
+|   `-- dependabot.yml
+|-- docs/
+|   |-- architecture/
+|   `-- diagrams/
+|-- scripts/
+|-- src/
+|-- tests/
+|-- package.json
+|-- package-lock.json
+`-- README.md
+```
 
 ## Continuous Integration
 
@@ -108,6 +145,7 @@ CI quality gates:
 - `npm ci` for clean lockfile-based installation
 - `npm run lint`
 - `npm run coverage`
+- `npm run check:docs`
 - `npm run check:hygiene`
 - `npm ls --depth=0`
 - `npm audit --audit-level=high`
@@ -139,6 +177,7 @@ Local CI-equivalent commands:
 npm ci
 npm run lint
 npm run coverage
+npm run check:docs
 npm run check:hygiene
 npm ls --depth=0
 npm audit --audit-level=high

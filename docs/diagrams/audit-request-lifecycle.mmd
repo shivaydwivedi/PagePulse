@@ -1,0 +1,30 @@
+flowchart TD
+  Request[POST audit request] --> RequestID[Create request ID]
+  RequestID --> Logging[Structured request logging]
+  Logging --> RateLimit[Rate limit decision]
+  RateLimit -->|Exceeded| RateReject[429 rate limit response]
+  RateLimit -->|Unavailable| LimiterUnavailable[503 limiter unavailable]
+  RateLimit -->|Allowed| JsonParser[Route JSON parser]
+  JsonParser --> ContentPolicy[Content type and body policy]
+  ContentPolicy --> Validation[Validate request body]
+  Validation --> Normalize[Normalize URL]
+  Normalize --> CacheOne[First cache lookup]
+  CacheOne -->|Hit| HitResponse[Return cached response]
+  CacheOne -->|Miss| Semaphore[Acquire semaphore]
+  Semaphore -->|Capacity exceeded| CapacityError[503 capacity response]
+  Semaphore --> CacheTwo[Second cache lookup]
+  CacheTwo -->|Hit| ReleaseHit[Release permit and return cached response]
+  CacheTwo -->|Miss| Safety[Destination safety and DNS]
+  Safety --> Transport[Safe transport and redirects]
+  Transport --> Analysis[HTML analysis]
+  Analysis --> Scoring[Scoring]
+  Scoring --> CacheSet[Safe cache storage]
+  CacheSet --> Release[Release permit]
+  Release --> Response[Controller response]
+  JsonParser -->|Invalid JSON| Error[Central error response]
+  ContentPolicy -->|Unsupported media| Error
+  Validation -->|Invalid body| Error
+  Safety -->|Blocked or DNS failure| Error
+  Transport -->|Transport error| Error
+  Analysis -->|Analysis error| Error
+  Scoring -->|Scoring error| Error
