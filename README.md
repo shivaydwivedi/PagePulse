@@ -1,8 +1,18 @@
 # PagePulse
 
-[![CI](https://github.com/shivaydwivedi/PagePulse/actions/workflows/ci.yml/badge.svg)](https://github.com/shivaydwivedi/PagePulse/actions/workflows/ci.yml)
+> Security-focused web page auditing service built with Node.js, Express 5, Zod, Undici, and Cheerio, providing SSRF-aware page validation, static HTML analysis, deterministic security scoring, and RESTful APIs with production-grade logging and testing.
+
+[![CI](https://github.com/shivaydwivedi/PagePulse/actions/workflows/ci.yml/badge.svg)](https://github.com/shivaydwivedi/PagePulse/actions/workflows/ci.yml)[![Node](https://img.shields.io/badge/node-%3E%3D22%20%3C25-339933)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D22%20%3C25-339933)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node.js](https://img.shields.io/badge/Node.js-22%2B-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express-5-000000?style=for-the-badge&logo=express&logoColor=white)
+![Zod](https://img.shields.io/badge/Zod-Validation-3E67B1?style=for-the-badge&logo=zod&logoColor=white)
+![Pino](https://img.shields.io/badge/Pino-Logger-687634?style=for-the-badge&logo=pino&logoColor=white)
+![Undici](https://img.shields.io/badge/Undici-HTTP_Client-000000?style=for-the-badge)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
+![CI](https://img.shields.io/badge/Tested-Vitest-success?style=for-the-badge)
+
 [![Live demo](https://img.shields.io/badge/demo-live-2f6f73)](https://pagepulse-3gub.onrender.com)
 
 PagePulse is a security-focused server-side web-page audit service for public HTTP and HTTPS pages. It validates destinations with SSRF-aware URL, DNS, IP, and redirect checks, fetches only bounded HTML responses, analyses static markup signals, and returns deterministic project-specific scores through a JSON API and a lightweight public UI.
