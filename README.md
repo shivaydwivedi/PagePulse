@@ -433,4 +433,9 @@ Built for [Digital Heroes Training Task](https://digitalheroesco.com).
 
 ## AI Usage Disclosure
 
-Development was assisted by AI coding tools under human direction and review. The repository content, implementation decisions, and verification results should be evaluated against the code and tests in this project rather than treated as claims of external certification.
+This project was primarily designed and developed by me, with the majority of the architecture, backend implementation, feature development, testing, and debugging completed through my own work. Throughout the development process, I leveraged AI-assisted coding tools where they could genuinely improve efficiency—whether for exploring implementation approaches, resolving challenging bugs, accelerating routine coding tasks, or refining documentation.
+
+Working under a tight project deadline, these tools helped me move faster without compromising my understanding or ownership of the code. Each and every technical decision, code change, and final implementation was done, reviewed, adapted, and validated by me before being integrated into the project.
+
+I leveraged AI as a productivity multiplier rather than a replacement for engineering expertise. This project represents my technical work, enhanced by modern development tools that enabled me to deliver a more robust solution within the available timeframe.
+
