@@ -420,6 +420,13 @@ Production verification is documented in [docs/deployment/production-verificatio
 
 PagePulse is released under the [MIT License](LICENSE).
 
+## Contact
+
+- Maintainer: Shivay Dwivedi
+- GitHub: [shivaydwivedi](https://github.com/shivaydwivedi)
+- LinkedIn: [shivay-dwivedi-54785b304](https://www.linkedin.com/in/shivay-dwivedi-54785b304)
+- Email: `shivayforwork@gmail.com`
+
 ## Digital Heroes Training Attribution
 
 Built for [Digital Heroes Training Task](https://digitalheroesco.com).
